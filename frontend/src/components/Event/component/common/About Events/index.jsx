@@ -11,7 +11,7 @@ const About = (props) => {
         link = "https://forms.gle/MZSAEnEvv11XBVyx7";
         break;
       case "Pixar":
-        link = "https://forms.gle/5RWNAjqp7UYJ1SDC9";
+        link = "/";
         break;
       case "Maze Up":
         link = "https://forms.gle/ZY3dkV15YYB583RWA";
