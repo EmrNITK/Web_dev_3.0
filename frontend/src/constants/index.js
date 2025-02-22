@@ -31,7 +31,7 @@ const services = [
     path: '/synapse'
   },
   {
-    title: "TECH FEST",
+    title: "Tech Fest",
     icon: emrlogo,
     path: '/event',
 
@@ -53,13 +53,13 @@ const services = [
     path: '/blog',
   },
   {
-    title: "GALLERY",
+    title: "Gallery",
     icon: emrlogo,
     path: '/gallery',
 
   },
   {
-    title: "TEAM",
+    title: "Team",
     icon: emrlogo,
     path: '/team',
   },
