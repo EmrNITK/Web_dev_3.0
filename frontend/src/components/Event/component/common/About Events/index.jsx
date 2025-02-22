@@ -11,7 +11,7 @@ const About = (props) => {
         link = "https://forms.gle/MZSAEnEvv11XBVyx7";
         break;
       case "Pixar":
-        link = "/";
+        link = "https://forms.gle/5RWNAjqp7UYJ1SDC9";
         break;
       case "Maze Up":
         link = "https://forms.gle/ZY3dkV15YYB583RWA";
@@ -39,7 +39,7 @@ const About = (props) => {
         link = "https://drive.google.com/file/d/1AFEnxY75gNZvOg3PiNuVbNWl-a7jmF5X/view?usp=drive_link";
         break;
       case "Pixar":
-        link = "https://drive.google.com/file/d/1tTE076A6yubjnk0Ho2ml0TU9xnyHAigZ/view?usp=drive_link";
+        link = "/";
         break;
       case "Maze Up":
         link = "https://drive.google.com/file/d/1UyyxiNyVL98Pk52Ms5vSHR1E3QnVjzRX/view?usp=drive_link";
