@@ -39,7 +39,7 @@ const About = (props) => {
         link = "https://drive.google.com/file/d/1AFEnxY75gNZvOg3PiNuVbNWl-a7jmF5X/view?usp=drive_link";
         break;
       case "Pixar":
-        link = "https://drive.google.com/file/d/1-PH6Om6WPqahCtJt9k198j41owDPOIHT/view?usp=drive_link";
+        link = "https://drive.google.com/file/d/1rZyEjGO1vyFX0a0LMfCuSbPJkAANy4cK/view?usp=drive_link";
         break;
       case "Maze Up":
         link = "https://drive.google.com/file/d/1UyyxiNyVL98Pk52Ms5vSHR1E3QnVjzRX/view?usp=drive_link";
