@@ -62,18 +62,12 @@ const UpiIcon = () => (
 );
 
 const getAppDeepLink = (app, rawUpiUrl) => {
-  if (!rawUpiUrl) return '#';
-  const cleanUrl = rawUpiUrl.replace(/^upi:\/\/pay\?/, '');
-  switch (app) {
-    case 'gpay':
-      return `tez://upi/pay?${cleanUrl}`;
-    case 'phonepe':
-      return `phonepe://pay?${cleanUrl}`;
-    case 'paytm':
-      return `paytmmp://pay?${cleanUrl}`;
-    default:
-      return rawUpiUrl;
-  }
+  return rawUpiUrl || '#';
+};
+
+const handleAppPay = (app, rawUpiUrl, e) => {
+  if (!rawUpiUrl) return;
+  window.location.href = rawUpiUrl;
 };
 
 const FileUploadInput = ({ el, value, onChange, hasError, label }) => {
@@ -745,13 +739,6 @@ export default function PublicForm() {
                       {paymentSession.instruction || "Complete UPI payment to finish form submission"}
                     </p>
                   </div>
-                  <div className="bg-[#0078d4]/10 border border-[#0078d4]/30 text-[#0078d4] text-xs font-medium px-2.5 py-1 rounded flex items-center gap-1.5 shrink-0">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0078d4] opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0078d4]"></span>
-                    </span>
-                    <span>Waiting for payment...</span>
-                  </div>
                 </div>
 
                 {/* Amount Display */}
@@ -820,7 +807,8 @@ export default function PublicForm() {
                   <div className="grid grid-cols-3 gap-2.5">
                     <a
                       href={getAppDeepLink('gpay', paymentSession.upiUrl)}
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
+                      onClick={(e) => handleAppPay('gpay', paymentSession.upiUrl, e)}
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm cursor-pointer"
                     >
                       <GooglePayIcon />
                       <span>Google Pay</span>
@@ -828,7 +816,8 @@ export default function PublicForm() {
 
                     <a
                       href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
+                      onClick={(e) => handleAppPay('phonepe', paymentSession.upiUrl, e)}
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm cursor-pointer"
                     >
                       <PhonePeIcon />
                       <span>PhonePe</span>
@@ -836,7 +825,8 @@ export default function PublicForm() {
 
                     <a
                       href={getAppDeepLink('paytm', paymentSession.upiUrl)}
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
+                      onClick={(e) => handleAppPay('paytm', paymentSession.upiUrl, e)}
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm cursor-pointer"
                     >
                       <PaytmIcon />
                       <span>Paytm</span>
