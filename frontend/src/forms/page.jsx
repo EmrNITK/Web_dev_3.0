@@ -23,26 +23,34 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 
 const GooglePayIcon = () => (
-  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
-    <rect width="24" height="24" rx="5" fill="#ffffff" />
-    <path d="M16.5 12.18c0-.38-.03-.77-.1-1.15H11.5v2.18h2.24c-.1.52-.39 1-.84 1.3l1.35 1.05c.79-.73 1.25-1.8 1.25-3.38z" fill="#4285F4"/>
-    <path d="M11.5 16.27c1.15 0 2.12-.38 2.83-1.04l-1.35-1.05c-.38.26-.87.41-1.48.41-1.14 0-2.11-.77-2.45-1.8H7.66v1.08c.72 1.43 2.2 2.4 3.84 2.4z" fill="#34A853"/>
-    <path d="M9.05 12.59c-.09-.26-.14-.54-.14-.84s.05-.58.14-.84V9.83H7.66C7.36 10.43 7.2 11.1 7.2 11.75s.16 1.32.46 1.92l1.39-1.08z" fill="#FBBC05"/>
-    <path d="M11.5 7.64c.63 0 1.19.22 1.63.64l1.22-1.22C13.62 6.37 12.65 6 11.5 6 9.86 6 8.38 6.97 7.66 8.4l1.39 1.08c.34-1.03 1.31-1.84 2.45-1.84z" fill="#EA4335"/>
+  <svg className="w-5 h-5 shrink-0" viewBox="0 -19 256 256" fill="none">
+    <g>
+      <path d="M232.503966,42.1689673 C207.253909,27.593266 174.966113,36.2544206 160.374443,61.5045895 L123.592187,125.222113 C112.948983,143.621675 126.650534,150.051007 141.928772,159.211427 L177.322148,179.639204 C189.30756,186.552676 204.616725,182.448452 211.530197,170.478784 L249.342585,104.997327 C262.045492,82.993425 254.507868,54.8722676 232.503966,42.1689673 Z" fill="#EA4335" />
+      <path d="M190.884248,68.541767 L155.490872,48.1141593 C135.952653,37.2682465 124.888287,36.5503588 116.866523,49.3002175 L64.6660169,139.704135 C50.0900907,164.938447 58.7669334,197.211061 84.0012455,211.755499 C106.005147,224.458406 134.126867,216.920782 146.829774,194.91688 L200.029486,102.764998 C206.973884,90.7801476 202.869661,75.4552386 190.884248,68.541767 Z" fill="#FBBC04" />
+      <path d="M197.696506,22.068674 L172.836685,7.71148235 C145.33968,-8.15950938 110.180221,1.25070674 94.3093189,28.7478917 L46.9771448,110.724347 C39.9857947,122.818845 44.1369141,138.299511 56.2315252,145.275398 L84.0720952,161.34929 C97.8203166,169.292894 115.392174,164.5797 123.335778,150.830917 L177.409304,57.1816314 C188.614245,37.7835939 213.411651,31.1355838 232.809294,42.3404686 L197.696506,22.068674 Z" fill="#34A853" />
+      <path d="M101.033296,52.202526 L74.1604429,36.7216914 C62.1750303,29.8240204 46.8660906,33.9126683 39.9527877,45.8666484 L7.71149357,101.579108 C-8.15952065,128.997954 1.25071234,164.079816 28.7479029,179.904047 L49.2069432,191.685907 L74.0198681,205.980684 L84.7879024,212.176099 C65.670846,199.37985 59.6002612,173.739558 71.2887797,153.545698 L79.6378018,139.126091 L110.20946,86.3008703 C117.107187,74.3784352 113.002964,59.1001971 101.033296,52.202526 Z" fill="#4285F4" />
+    </g>
   </svg>
 );
 
 const PhonePeIcon = () => (
   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
-    <rect width="24" height="24" rx="5" fill="#5f259f" />
-    <path d="M15.5 6.5H8.5C7.4 6.5 6.5 7.4 6.5 8.5v7c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2v-7c0-1.1-.9-2-2-2zm-3.5 9c-1.4 0-2.5-1.1-2.5-2.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5-1.1 2.5-2.5 2.5zm2.5-6h-5V8h5v1.5z" fill="#ffffff" />
+    <path
+      d="M10.206 9.941h2.949v4.692c-.402.201-.938.268-1.34.268-1.072 0-1.609-.536-1.609-1.743V9.941zm13.47 4.816c-1.523 6.449-7.985 10.442-14.433 8.919C2.794 22.154-1.199 15.691.324 9.243 1.847 2.794 8.309-1.199 14.757.324c6.449 1.523 10.442 7.985 8.919 14.433zm-6.231-5.888a.887.887 0 0 0-.871-.871h-1.609l-3.686-4.222c-.335-.402-.871-.536-1.407-.402l-1.274.401c-.201.067-.268.335-.134.469l4.021 3.82H6.386c-.201 0-.335.134-.335.335v.67c0 .469.402.871.871.871h.938v3.217c0 2.413 1.273 3.82 3.418 3.82.67 0 1.206-.067 1.877-.335v2.145c0 .603.469 1.072 1.072 1.072h.938a.432.432 0 0 0 .402-.402V9.874h1.542c.201 0 .335-.134.335-.335v-.67z"
+      fill="#5F259F"
+    />
+
   </svg>
 );
 
 const PaytmIcon = () => (
-  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
-    <rect width="24" height="24" rx="5" fill="#002E6E" />
-    <path d="M5 14.5L7.2 8h2l-2.2 6.5H5zm3.8 0L11 8h2l-2.2 6.5H8.8zm5.5-4h1.8c.7 0 1.3.3 1.3 1 0 .8-.6 1.2-1.4 1.2h-1.7v1.8h-1.8V10.5zm1.8 1h-.8v.6h.8c.2 0 .4-.1.4-.3s-.2-.3-.4-.3z" fill="#00BAF2" />
+  <svg className="w-5 h-5 shrink-0" viewBox="-164 191.6 512 193" fill="none">
+    <path d="M229.8,243.2c2-1.6,3-2.4,4-3.2c13.9-11.8,31.7-10.5,43.6,3.5c1.2,1.4,1.8,1.5,3,0.3c0.8-0.9,1.7-1.6,2.5-2.5c9.3-9.1,21.6-11.8,33.1-6.7c12.1,5.4,18.6,14.9,18.7,28.2c0.2,28.7,0.1,57.3,0.1,86c0,10.2-6.3,16.6-16.4,16.6c-4,0-8-0.3-12,0.1c-4.1,0.4-5.3-0.9-5.3-5.2c0.2-28,0.1-56,0.1-84c0-1.2,0-2.3,0-3.5c-0.1-6.5-2.7-9.2-8.9-9.5c-5.6-0.3-9.5,3.1-10.1,8.8c-0.1,1.3,0,2.7,0,4c0,24.2,0,48.3,0,72.5c0,10.6-6.1,16.8-16.7,16.7c-5.4-0.1-12.7,2.4-15.8-1.1c-2.7-3-0.9-10.1-0.9-15.4c0-24.8,0-49.7,0-74.5c0-8.8-5.7-13.3-13.1-10.3c-4.6,1.9-6.1,5.6-6.1,10.4c0.1,23.2,0,46.3,0,69.5c0,1.8,0,3.7,0,5.5c-0.3,9.7-6.5,15.8-16.1,15.9c-4,0.1-8-0.3-12,0.1c-4.3,0.4-5.6-0.8-5.5-5.4c0.2-39.3,0.1-78.6,0.1-118c0-1.7,0.1-3.3,0-5c-0.2-2.2,0.7-2.9,2.9-2.9c9.2,0.1,18.3,0.1,27.5,0c2.3,0,3.4,0.6,3.2,3.1C229.5,239,229.7,240.6,229.8,243.2z" fill="#02b9ef" />
+    <path d="M17.8 297.4c0 13.7 0 27.3 0 41-.1 17.8-9.4 27-27.2 27.1-7.8 0-15.7.1-23.5 0-15.8-.2-27.4-10.7-28.2-26.5-.6-11.3-.7-22.7-.1-34 .8-16.2 13.2-27.6 29.6-27.8 4.3-.1 8.7 0 13 0 4.2-.1 5.8-2.5 5.7-6.5 0-4-1.8-5.8-5.8-5.6-4.5.1-9 .1-13.5 0-11-.2-17.1-6.2-17-17 0-4.4-2-10.3.9-12.9 2.5-2.2 8.2-.8 12.5-.8 11.2-.1 22.3 0 33.5 0 11.9 0 20 8.1 20.1 20.1C17.9 268.7 17.8 283.1 17.8 297.4zM-12.8 320.1c0-1.7 0-3.3 0-5 0-10.2 0-10.2-10.2-9.8-5.1.2-7.9 2.8-8 8.1-.1 4.2-.1 8.3 0 12.5.1 7.2 3.3 9.1 13.7 9.4 7.7.2 3.8-5.2 4.5-8.2C-12.4 324.9-12.9 322.4-12.8 320.1z" fill="#02b9ef" />
+    <path d="M106.8 286.5c0 15.3.2 30.7-.1 46-.2 11.8-3 22.5-14.4 28.8-4.6 2.5-9.6 3.9-14.8 4-11.5.2-23 0-34.5.2-2.8 0-3.4-1-3.3-3.5.2-4.2-.1-8.3.1-12.5.2-8 6.3-14.1 14.3-14.4 5.2-.2 10.3-.1 15.5 0 4.2 0 6.5-1.7 6.5-6.2 0-4.6-2.2-6.2-6.4-6.3-7-.2-14 .8-20.9-1.2-11.9-3.5-20.6-13.4-20.9-25.7-.6-19.5-.2-39-.3-58.5 0-2.2.7-2.9 2.9-2.8 8.2.1 16.3.2 24.5 0 3.6-.1 3.1 1.9 3.1 4.1 0 14.7 0 29.3 0 44 0 6.4 3 9.8 8.6 10 6.6.2 9.5-2.5 9.5-9.2 0-14.8.1-29.7-.1-44.5 0-3.5.9-4.5 4.4-4.4 7.3.3 14.7.4 22 0 4-.2 4.6 1.3 4.5 4.8C106.7 254.9 106.8 270.7 106.8 286.5z" fill="#02b9ef" />
+    <path d="M-148 309.2c0-16.3 0-32.7 0-49 0-16 9.8-26 25.9-25.8 10.5.1 21-1.2 31.4.8 13.3 2.6 21.7 12.9 21.8 26.6.1 14.5 0 29 0 43.5 0 18.2-10.7 29.3-28.9 29.8-5.5.2-11 .1-16.5 0-2.5-.1-3.6.7-3.5 3.4.2 4 .1 8 0 12-.2 8.6-6.3 14.8-14.8 14.9-5 .1-11.3 2.1-14.5-.8-3-2.7-.8-9.1-.9-13.9C-148.1 336.9-148 323-148 309.2zM-117.8 284.7c0 3.2 0 6.3 0 9.5 0 11.3 0 11.3 11.3 10.3 4.9-.4 7.2-2.8 7.3-7.7.1-5.6-.2-11.3.1-16.9.6-16.2-2.4-14.6-15.6-14.7-2.4 0-3.2.7-3.2 3.1C-117.7 273.7-117.8 279.2-117.8 284.7z" fill="#06306f" />
+    <path d="M135.1,309.4c0-13.3-0.1-26.7,0.1-40c0-3.1-0.7-4.4-4.1-4.3c-4.5,0.2-10.5,1.5-13-0.7c-3.1-2.9-.7-9.1-1.1-13.9c0-0.3,0-0.7,0-1c0-4.7-1.5-10.2,0.5-13.7s8.1-1.3,12.4-2.4c8.5-2.2,14.9-7.1,20.1-13.9c3.6-4.6,8.1-7.9,13.9-9c3.1-0.6,5-0.2,4.8,3.8c-0.3,5.6,0,11.3-0.1,17c-0.1,2.4,0.8,3.2,3.2,3.1c4-0.1,8,0.1,12-0.1c2.4-0.1,3.2,0.8,3.1,3.2c-0.1,8.2-0.1,16.3,0,24.5c0,2.3-.6,3.5-3.1,3.2c-.5-.1-1,0-1.5,0c-4.4.4-10.5-2-12.8,1c-2.2,2.8-.8,8.6-.8,13.1c0,27.2-.1,54.3.1,81.5c0,3.8-1,5-4.8,4.7c-3.6-.3-7.3,0-11-0.1c-10.8-.4-17.9-7.7-17.9-18.5C135.1,334.4,135.1,321.9,135.1,309.4z" fill="#02b9ef" />
+
   </svg>
 );
 
@@ -58,7 +66,7 @@ const getAppDeepLink = (app, rawUpiUrl) => {
   const cleanUrl = rawUpiUrl.replace(/^upi:\/\/pay\?/, '');
   switch (app) {
     case 'gpay':
-      return `gpay://upi/pay?${cleanUrl}`;
+      return `tez://upi/pay?${cleanUrl}`;
     case 'phonepe':
       return `phonepe://pay?${cleanUrl}`;
     case 'paytm':
@@ -242,7 +250,7 @@ export default function PublicForm() {
               setHasAlreadySubmitted(true);
               localStorage.setItem(`submitted_${id}`, 'true');
             }
-          } catch (err) {}
+          } catch (err) { }
         }
       }
 
@@ -279,7 +287,7 @@ export default function PublicForm() {
   const displayElements = useMemo(() => {
     if (!form?.sections?.[currentSectionIndex]) return [];
     let elements = [...form.sections[currentSectionIndex].elements];
-    
+
     if (form.settings.shuffleQuestionOrder) {
       for (let i = elements.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -405,15 +413,15 @@ export default function PublicForm() {
       }, {
         withCredentials: true
       });
-      
+
       setSubmissionResult(response.data);
       setIsSubmitted(true);
       localStorage.removeItem(storageKey);
       localStorage.setItem(`submitted_${id}`, 'true');
-    } catch (err) { 
-      toast.error(err.response?.data?.message || "Submission error"); 
-    } finally { 
-      setIsSubmitting(false); 
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Submission error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -460,17 +468,6 @@ export default function PublicForm() {
       toast.error(err.response?.data?.message || "Failed to submit payment proof");
     } finally {
       setIsSubmittingManual(false);
-    }
-  };
-
-  const getAppDeepLink = (appScheme, upiUrl) => {
-    if (!upiUrl) return '#';
-    const params = upiUrl.replace('upi://pay?', '');
-    switch (appScheme) {
-      case 'gpay': return `gpay://upi/pay?${params}`;
-      case 'phonepe': return `phonepe://pay?${params}`;
-      case 'paytm': return `paytmmp://pay?${params}`;
-      default: return upiUrl;
     }
   };
 
@@ -650,7 +647,7 @@ export default function PublicForm() {
           <Lock className="text-[#0078d4] w-12 h-12 mx-auto mb-4" />
           <h1 className="text-xl font-bold text-white mb-2">Sign in required</h1>
           <p className="text-sm text-zinc-400 mb-6">This form requires you to be logged in to view and submit responses securely.</p>
-          <Button onClick={() => navigate('/a/login?redirect=/form/'+id)} className="bg-[#0078d4] hover:bg-[#005a9e] text-white w-full font-semibold">Sign in to continue</Button>
+          <Button onClick={() => navigate('/a/login?redirect=/form/' + id)} className="bg-[#0078d4] hover:bg-[#005a9e] text-white w-full font-semibold">Sign in to continue</Button>
         </div>
       </div>
     );
@@ -698,15 +695,15 @@ export default function PublicForm() {
             <p className="text-sm text-zinc-400 mb-6 whitespace-pre-wrap">
               {submissionResult?.message || "Your response has been recorded."}
             </p>
-            
+
             {submissionResult?.score && (
-               <div className="mb-6 inline-block bg-zinc-900 border border-zinc-700 rounded-lg p-4">
-                  <p className="text-sm text-zinc-400">Total Score</p>
-                  <p className="text-3xl font-bold text-[#0078d4]">{submissionResult.score.totalScore} <span className="text-lg text-zinc-500">/ {submissionResult.score.maxScore}</span></p>
-               </div>
+              <div className="mb-6 inline-block bg-zinc-900 border border-zinc-700 rounded-lg p-4">
+                <p className="text-sm text-zinc-400">Total Score</p>
+                <p className="text-3xl font-bold text-[#0078d4]">{submissionResult.score.totalScore} <span className="text-lg text-zinc-500">/ {submissionResult.score.maxScore}</span></p>
+              </div>
             )}
 
-{!form.settings.limitToOneResponse && (
+            {!form.settings.limitToOneResponse && (
               <Button onClick={() => window.location.reload()} className="bg-zinc-200 text-black hover:bg-white h-9 text-sm font-semibold">Submit another response</Button>
             )}
           </div>
@@ -816,27 +813,14 @@ export default function PublicForm() {
 
                 {/* Quick App Intent Buttons */}
                 <div className="space-y-2 pt-1">
-                  <label className="text-xs font-semibold text-zinc-300">
-                    Pay with App
+                  <label className="text-xs font-semibold text-zinc-300 block">
+                    Pay directly with App:
                   </label>
 
-                  <a
-                    href={paymentSession.upiUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="w-full bg-[#0078d4] hover:bg-[#005a9e] text-white text-sm font-semibold h-9 rounded flex items-center justify-center gap-2 shadow-sm transition-colors"
-                  >
-                    <UpiIcon />
-                    <span>Open Default UPI App</span>
-                    <ExternalLink size={14} className="opacity-70" />
-                  </a>
-
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-3 gap-2.5">
                     <a
                       href={getAppDeepLink('gpay', paymentSession.upiUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white text-xs h-9 rounded flex items-center justify-center gap-2 transition-colors"
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
                     >
                       <GooglePayIcon />
                       <span>Google Pay</span>
@@ -844,9 +828,7 @@ export default function PublicForm() {
 
                     <a
                       href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white text-xs h-9 rounded flex items-center justify-center gap-2 transition-colors"
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
                     >
                       <PhonePeIcon />
                       <span>PhonePe</span>
@@ -854,9 +836,7 @@ export default function PublicForm() {
 
                     <a
                       href={getAppDeepLink('paytm', paymentSession.upiUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white text-xs h-9 rounded flex items-center justify-center gap-2 transition-colors"
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
                     >
                       <PaytmIcon />
                       <span>Paytm</span>
@@ -1018,18 +998,18 @@ export default function PublicForm() {
             ))}
 
             {form.settings.sendResponderCopy === 'WHEN_REQUESTED' && currentSectionIndex === form.sections.length - 1 && (
-               <div className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-4 flex items-center space-x-3">
-                  <input 
-                    type="checkbox" 
-                    id="requestCopy" 
-                    checked={requestCopy} 
-                    onChange={(e) => setRequestCopy(e.target.checked)} 
-                    className="w-4 h-4 accent-[#0078d4] bg-black border-zinc-700 rounded" 
-                  />
-                  <label htmlFor="requestCopy" className="text-sm text-zinc-300 cursor-pointer">
-                    Send me a copy of my responses
-                  </label>
-               </div>
+              <div className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-4 flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="requestCopy"
+                  checked={requestCopy}
+                  onChange={(e) => setRequestCopy(e.target.checked)}
+                  className="w-4 h-4 accent-[#0078d4] bg-black border-zinc-700 rounded"
+                />
+                <label htmlFor="requestCopy" className="text-sm text-zinc-300 cursor-pointer">
+                  Send me a copy of my responses
+                </label>
+              </div>
             )}
 
             <div className="flex items-center justify-between pt-4 pb-8">
