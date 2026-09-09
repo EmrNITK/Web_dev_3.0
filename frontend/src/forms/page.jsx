@@ -9,7 +9,7 @@ import {
   Loader2, ChevronLeft, UploadCloud, Calendar as CalendarIcon,
   Clock, AlertCircle, Home, FileText, ShieldCheck, Info,
   HomeIcon, Lock, CreditCard, ExternalLink, RefreshCw, CheckCircle2,
-  HelpCircle, Send, Phone, Hash, QrCode
+  HelpCircle, Send, Phone, Hash, QrCode, Copy, Check
 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { cn } from "@/lib/utils";
@@ -21,6 +21,52 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+
+const GooglePayIcon = () => (
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+    <rect width="24" height="24" rx="5" fill="#ffffff" />
+    <path d="M16.5 12.18c0-.38-.03-.77-.1-1.15H11.5v2.18h2.24c-.1.52-.39 1-.84 1.3l1.35 1.05c.79-.73 1.25-1.8 1.25-3.38z" fill="#4285F4"/>
+    <path d="M11.5 16.27c1.15 0 2.12-.38 2.83-1.04l-1.35-1.05c-.38.26-.87.41-1.48.41-1.14 0-2.11-.77-2.45-1.8H7.66v1.08c.72 1.43 2.2 2.4 3.84 2.4z" fill="#34A853"/>
+    <path d="M9.05 12.59c-.09-.26-.14-.54-.14-.84s.05-.58.14-.84V9.83H7.66C7.36 10.43 7.2 11.1 7.2 11.75s.16 1.32.46 1.92l1.39-1.08z" fill="#FBBC05"/>
+    <path d="M11.5 7.64c.63 0 1.19.22 1.63.64l1.22-1.22C13.62 6.37 12.65 6 11.5 6 9.86 6 8.38 6.97 7.66 8.4l1.39 1.08c.34-1.03 1.31-1.84 2.45-1.84z" fill="#EA4335"/>
+  </svg>
+);
+
+const PhonePeIcon = () => (
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+    <rect width="24" height="24" rx="5" fill="#5f259f" />
+    <path d="M15.5 6.5H8.5C7.4 6.5 6.5 7.4 6.5 8.5v7c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2v-7c0-1.1-.9-2-2-2zm-3.5 9c-1.4 0-2.5-1.1-2.5-2.5s1.1-2.5 2.5-2.5 2.5 1.1 2.5 2.5-1.1 2.5-2.5 2.5zm2.5-6h-5V8h5v1.5z" fill="#ffffff" />
+  </svg>
+);
+
+const PaytmIcon = () => (
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+    <rect width="24" height="24" rx="5" fill="#002E6E" />
+    <path d="M5 14.5L7.2 8h2l-2.2 6.5H5zm3.8 0L11 8h2l-2.2 6.5H8.8zm5.5-4h1.8c.7 0 1.3.3 1.3 1 0 .8-.6 1.2-1.4 1.2h-1.7v1.8h-1.8V10.5zm1.8 1h-.8v.6h.8c.2 0 .4-.1.4-.3s-.2-.3-.4-.3z" fill="#00BAF2" />
+  </svg>
+);
+
+const UpiIcon = () => (
+  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none">
+    <rect width="24" height="24" rx="5" fill="#0078D4" />
+    <path d="M12 5l-5 7h4v7l5-7h-4V5z" fill="#ffffff" />
+  </svg>
+);
+
+const getAppDeepLink = (app, rawUpiUrl) => {
+  if (!rawUpiUrl) return '#';
+  const cleanUrl = rawUpiUrl.replace(/^upi:\/\/pay\?/, '');
+  switch (app) {
+    case 'gpay':
+      return `gpay://upi/pay?${cleanUrl}`;
+    case 'phonepe':
+      return `phonepe://pay?${cleanUrl}`;
+    case 'paytm':
+      return `paytmmp://pay?${cleanUrl}`;
+    default:
+      return rawUpiUrl;
+  }
+};
 
 const FileUploadInput = ({ el, value, onChange, hasError, label }) => {
   const [status, setStatus] = useState(value ? 'success' : 'idle');
@@ -126,6 +172,7 @@ export default function PublicForm() {
   const [manualTxnId, setManualTxnId] = useState('');
   const [manualPhone, setManualPhone] = useState('');
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
 
   const [currentSectionIndex, setCurrentSectionIndex] = useState(() => JSON.parse(localStorage.getItem(storageKey))?.currentSectionIndex || 0);
   const [answers, setAnswers] = useState(() => JSON.parse(localStorage.getItem(storageKey))?.answers || {});
@@ -656,121 +703,187 @@ export default function PublicForm() {
                </div>
             )}
 
-            {!form.settings.limitToOneResponse && (
+{!form.settings.limitToOneResponse && (
               <Button onClick={() => window.location.reload()} className="bg-zinc-200 text-black hover:bg-white h-9 text-sm font-semibold">Submit another response</Button>
             )}
           </div>
         ) : isPaymentStep && paymentSession ? (
-          /* PAYMENT STEP CARD */
-          <div className="space-y-4">
-            <div className="bg-[#0c0c0c] border border-zinc-800 border-t-4 border-t-[#51b749] rounded-md p-6 space-y-6">
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
-                <div className="flex items-center space-x-3">
-                  <CreditCard className="text-[#51b749]" size={28} />
+          /* MICROSOFT FLUENT STYLE PAYMENT STEP CARD */
+          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-300">
+            {/* Top Microsoft Fluent Acrylic Header */}
+            <div className="relative bg-[#0b0e14]/90 backdrop-blur-xl border border-[#0078d4]/30 rounded-2xl p-6 sm:p-8 shadow-[0_12px_40px_rgba(0,120,212,0.15)] overflow-hidden">
+              {/* Microsoft Fluent Accent Top Line */}
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0078d4] via-[#106ebe] to-[#00a4ef]" />
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
+                <div className="flex items-center space-x-3.5">
+                  <div className="p-3 bg-[#0078d4]/15 border border-[#0078d4]/40 rounded-xl text-[#0078d4] shadow-sm">
+                    <CreditCard size={26} />
+                  </div>
                   <div>
-                    <h2 className="text-lg font-bold text-white">Payment Required</h2>
-                    <p className="text-xs text-zinc-400">{paymentSession.instruction || "Complete UPI payment to finish form submission"}</p>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-white tracking-tight">Payment Verification</h2>
+                      <span className="text-[10px] uppercase tracking-wider font-extrabold bg-[#0078d4]/20 border border-[#0078d4]/40 text-[#00a4ef] px-2.5 py-0.5 rounded-full">
+                        Fluent Checkout
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      {paymentSession.instruction || "Complete UPI payment to finish form submission"}
+                    </p>
                   </div>
                 </div>
 
-                <div className="bg-[#13703a]/20 border border-[#51b749]/30 text-[#51b749] text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
-                  <RefreshCw className="animate-spin" size={12} /> Auto Polling
+                <div className="self-start sm:self-auto bg-[#0078d4]/10 border border-[#0078d4]/30 text-[#00a4ef] text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00a4ef] opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0078d4]"></span>
+                  </span>
+                  <span>Auto Polling Active</span>
                 </div>
               </div>
 
               {/* Amount Hero Card */}
-              <div className="bg-[#050505] border border-zinc-800 p-5 rounded-lg text-center space-y-1">
-                <span className="text-xs text-zinc-400 uppercase tracking-widest font-semibold">Exact Amount to Pay</span>
-                <div className="text-4xl font-extrabold text-white">₹{paymentSession.exactAmount.toFixed(2)}</div>
-                <p className="text-xs text-[#51b749] font-mono">
-                  Base Amount: ₹{paymentSession.baseAmount} (Tracked Amount)
+              <div className="mt-6 bg-[#07090e] border border-white/10 p-6 rounded-xl text-center relative overflow-hidden group shadow-inner">
+                <div className="absolute inset-0 bg-gradient-to-b from-[#0078d4]/10 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <span className="text-[11px] text-zinc-400 uppercase tracking-widest font-semibold block mb-1">
+                  Exact Tracked Amount
+                </span>
+                <div className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,120,212,0.4)]">
+                  ₹{paymentSession.exactAmount.toFixed(2)}
+                </div>
+                <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 bg-[#0078d4]/15 border border-[#0078d4]/30 rounded-full text-xs font-mono text-[#00a4ef]">
+                  <span>Base: ₹{paymentSession.baseAmount}.00</span>
+                  <span className="text-zinc-500">•</span>
+                  <span>Offset Assigned for Instant Verification</span>
+                </div>
+              </div>
+
+              {/* Interactive QR Code Display */}
+              <div className="mt-6 flex flex-col items-center gap-3">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-[#0078d4] to-[#00a4ef] rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+                  <div className="relative bg-white p-5 rounded-2xl shadow-2xl border border-white/40 flex items-center justify-center">
+                    <QRCodeSVG value={paymentSession.upiUrl} size={210} level="H" includeMargin={true} />
+                  </div>
+                </div>
+                <p className="text-xs text-zinc-400 flex items-center gap-1.5 font-medium mt-1">
+                  <QrCode size={15} className="text-[#0078d4]" /> Scan with Google Pay, PhonePe, Paytm, or any UPI App
                 </p>
               </div>
 
-              {/* QR Code */}
-              <div className="flex flex-col items-center gap-3 py-2">
-                <div className="bg-white p-4 rounded-xl shadow-xl border border-zinc-300">
-                  <QRCodeSVG value={paymentSession.upiUrl} size={200} level="H" includeMargin={true} />
+              {/* Merchant Details Card with Quick Copy */}
+              <div className="mt-6 bg-[#07090e]/80 p-4 rounded-xl border border-white/10 text-xs space-y-2.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-400">Merchant Name:</span>
+                  <span className="font-semibold text-white">{paymentSession.merchantName}</span>
                 </div>
-                <p className="text-xs text-zinc-400 flex items-center gap-1">
-                  <QrCode size={14} className="text-[#51b749]" /> Scan with any UPI app on your mobile device
-                </p>
-              </div>
 
-              {/* Merchant Details */}
-              <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800 text-xs space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Merchant Name:</span>
-                  <span className="font-semibold text-zinc-200">{paymentSession.merchantName}</span>
+                <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                  <span className="text-zinc-400">Merchant UPI ID:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono font-medium text-[#00a4ef] bg-[#0078d4]/10 px-2 py-0.5 rounded border border-[#0078d4]/20">
+                      {paymentSession.merchantUpiId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(paymentSession.merchantUpiId);
+                        setCopiedUpi(true);
+                        toast.success("UPI ID copied to clipboard!");
+                        setTimeout(() => setCopiedUpi(false), 2000);
+                      }}
+                      className="p-1 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded transition-colors"
+                      title="Copy UPI ID"
+                    >
+                      {copiedUpi ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+                    </button>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Merchant UPI ID:</span>
-                  <span className="font-mono text-zinc-200">{paymentSession.merchantUpiId}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Order Ref:</span>
+
+                <div className="flex justify-between items-center pt-1 border-t border-white/5">
+                  <span className="text-zinc-400">Order Reference:</span>
                   <span className="font-mono text-zinc-400">{paymentSession.orderId}</span>
                 </div>
               </div>
 
-              {/* UPI App Intent Buttons */}
-              <div className="space-y-2">
-                <label className="text-xs font-semibold text-zinc-400 block">Pay Directly via App:</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <a
-                    href={paymentSession.upiUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="col-span-2 bg-[#51b749] hover:bg-[#38984c] text-white text-xs font-bold p-3 rounded-md text-center flex items-center justify-center gap-2 transition-all"
-                  >
-                    <ExternalLink size={14} /> Open Default UPI App
-                  </a>
+              {/* Quick UPI App Intent Buttons */}
+              <div className="mt-6 space-y-3">
+                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
+                  Tap to Pay Directly with App:
+                </label>
+
+                {/* Main Default UPI Button */}
+                <a
+                  href={paymentSession.upiUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full bg-[#0078d4] hover:bg-[#106ebe] active:bg-[#005a9e] text-white text-xs font-bold py-3.5 px-4 rounded-xl text-center flex items-center justify-center gap-2.5 shadow-[0_4px_20px_rgba(0,120,212,0.3)] transition-all transform hover:-translate-y-0.5"
+                >
+                  <UpiIcon />
+                  <span>Open Default UPI App</span>
+                  <ExternalLink size={14} className="ml-auto opacity-70" />
+                </a>
+
+                {/* Specific App Grid with Real Logomark Icons */}
+                <div className="grid grid-cols-3 gap-2.5 pt-1">
                   <a
                     href={getAppDeepLink('gpay', paymentSession.upiUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 text-xs font-bold p-2.5 rounded-md text-center"
+                    className="bg-[#131722] hover:bg-[#1c2232] border border-white/10 hover:border-[#4285F4]/50 text-white text-xs font-semibold p-3 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm"
                   >
-                    Google Pay
+                    <GooglePayIcon />
+                    <span className="group-hover:text-[#4285F4] transition-colors text-[11px]">Google Pay</span>
                   </a>
+
                   <a
                     href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-400 text-xs font-bold p-2.5 rounded-md text-center"
+                    className="bg-[#131722] hover:bg-[#1c2232] border border-white/10 hover:border-[#5f259f]/50 text-white text-xs font-semibold p-3 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm"
                   >
-                    PhonePe
+                    <PhonePeIcon />
+                    <span className="group-hover:text-[#a062db] transition-colors text-[11px]">PhonePe</span>
                   </a>
+
                   <a
                     href={getAppDeepLink('paytm', paymentSession.upiUrl)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-400 text-xs font-bold p-2.5 rounded-md text-center col-span-2"
+                    className="bg-[#131722] hover:bg-[#1c2232] border border-white/10 hover:border-[#00BAF2]/50 text-white text-xs font-semibold p-3 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm"
                   >
-                    Paytm
+                    <PaytmIcon />
+                    <span className="group-hover:text-[#00BAF2] transition-colors text-[11px]">Paytm</span>
                   </a>
                 </div>
               </div>
 
-              {/* Manual Verification Fallback Button */}
-              <div className="pt-4 border-t border-zinc-800 space-y-4">
+              {/* Manual Proof Verification Accordion */}
+              <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
                 <button
                   type="button"
                   onClick={() => setShowManualProof(!showManualProof)}
-                  className="w-full text-xs font-semibold text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-md flex items-center justify-center gap-2 transition-colors"
+                  className="w-full text-xs font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 p-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm"
                 >
-                  <HelpCircle size={14} /> Payment done but not showing here?
+                  <HelpCircle size={15} className="text-amber-400" />
+                  <span>Payment completed but status not updating?</span>
                 </button>
 
                 {showManualProof && (
-                  <form onSubmit={handleManualProofSubmit} className="bg-zinc-950 p-4 rounded-md border border-zinc-800 space-y-3">
-                    <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">Manual Payment Verification</h4>
-                    <p className="text-[11px] text-zinc-400">
-                      Upload your payment screenshot and UTR transaction ID for manual admin approval.
-                    </p>
+                  <form onSubmit={handleManualProofSubmit} className="bg-[#07090e] p-5 rounded-xl border border-amber-500/20 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="border-b border-white/10 pb-3">
+                      <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
+                        <ShieldCheck size={16} /> Manual Payment Verification
+                      </h4>
+                      <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                        If your payment was completed via bank app but hasn't auto-verified yet, submit your transaction details below for immediate admin review.
+                      </p>
+                    </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs text-zinc-300 font-semibold">Payment Screenshot</label>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-200 font-medium block">
+                        Payment Screenshot Proof
+                      </label>
                       <FileUploadInput
                         value={manualScreenshot}
                         onChange={(url) => setManualScreenshot(url)}
@@ -778,23 +891,23 @@ export default function PublicForm() {
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs text-zinc-300 font-semibold flex items-center gap-1">
-                        <Hash size={12} className="text-[#51b749]" /> UTR / Transaction ID <span className="text-red-500">*</span>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-200 font-medium flex items-center gap-1">
+                        <Hash size={13} className="text-[#0078d4]" /> UTR / Bank Transaction Reference <span className="text-red-400">*</span>
                       </label>
                       <Input
                         type="text"
-                        placeholder="e.g. 123456789012"
+                        placeholder="e.g. 425091827364"
                         value={manualTxnId}
                         onChange={(e) => setManualTxnId(e.target.value)}
                         required
-                        className="bg-[#0a0a0a] border-zinc-800 h-9 text-xs"
+                        className="bg-[#0b0e14] border-white/10 h-10 text-xs text-white focus:border-[#0078d4]"
                       />
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="text-xs text-zinc-300 font-semibold flex items-center gap-1">
-                        <Phone size={12} className="text-[#51b749]" /> Contact Phone Number <span className="text-red-500">*</span>
+                    <div className="space-y-1.5">
+                      <label className="text-xs text-zinc-200 font-medium flex items-center gap-1">
+                        <Phone size={13} className="text-[#0078d4]" /> Contact Phone Number <span className="text-red-400">*</span>
                       </label>
                       <Input
                         type="text"
@@ -802,25 +915,26 @@ export default function PublicForm() {
                         value={manualPhone}
                         onChange={(e) => setManualPhone(e.target.value)}
                         required
-                        className="bg-[#0a0a0a] border-zinc-800 h-9 text-xs"
+                        className="bg-[#0b0e14] border-white/10 h-10 text-xs text-white focus:border-[#0078d4]"
                       />
                     </div>
 
                     <Button
                       type="submit"
                       disabled={isSubmittingManual}
-                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs h-9"
+                      className="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-black font-bold text-xs h-10 rounded-xl shadow-md transition-all"
                     >
-                      {isSubmittingManual ? <Loader2 className="animate-spin mr-2" size={14} /> : <Send size={14} className="mr-1.5" />}
-                      Submit Proof & Complete Form
+                      {isSubmittingManual ? <Loader2 className="animate-spin mr-2" size={15} /> : <Send size={15} className="mr-2" />}
+                      Submit Verification Proof & Finish Form
                     </Button>
                   </form>
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-2">
-                <Button variant="outline" onClick={handleBack} className="h-9 text-sm border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900">
-                  <ChevronLeft size={16} className="mr-1" /> Back
+              {/* Footer Actions */}
+              <div className="flex items-center justify-between pt-4 border-t border-white/10">
+                <Button variant="outline" onClick={handleBack} className="h-9 px-4 text-xs font-semibold border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 rounded-xl">
+                  <ChevronLeft size={16} className="mr-1" /> Return to Questions
                 </Button>
               </div>
             </div>

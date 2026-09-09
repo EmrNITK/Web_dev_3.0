@@ -19,7 +19,9 @@ import {
   getFormResponses2,
   initiateFormPayment,
   checkFormPaymentStatus,
-  submitFormManualPaymentProof
+  submitFormManualPaymentProof,
+  processPayhookWebhook,
+  updateResponsePaymentStatus
 } from '../controllers/formController.js';
 import * as teamCtrl from '../controllers/teamController.js';
 import * as responseController from '../controllers/responseController.js';
@@ -33,6 +35,7 @@ router.use('/', authRoutes);
 
 // Public routes (no auth)
 router.post('/upload', uploadMiddleware.single('file'), uploadFile);
+router.post('/webhooks/payhook', processPayhookWebhook);
 router.get('/home-content', publicCtrl.getHomeContent);
 router.get('/gallery', publicCtrl.getGallery);
 router.get('/options', publicCtrl.getOptions);
@@ -43,6 +46,7 @@ router.post('/forms/public/:id', submitFormResponse);
 router.post('/forms/public/:id/create-payment', initiateFormPayment);
 router.get('/forms/public/:id/payment-status/:orderId', checkFormPaymentStatus);
 router.post('/forms/public/:id/manual-payment-proof', submitFormManualPaymentProof);
+router.put('/responses/:id/payment-status', auth, updateResponsePaymentStatus);
 
 router.post('/options', auth, genericCtrl.createOption);
 router.delete('/options/:type/:value', auth, genericCtrl.deleteOption);

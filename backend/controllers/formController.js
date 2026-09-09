@@ -141,6 +141,138 @@ export const checkFormPaymentStatus = async (req, res) => {
   }
 };
 
+// Webhook for Payhook notifications
+export const processPayhookWebhook = async (req, res) => {
+  try {
+    const { title, text, timestamp } = req.body;
+    console.log('宿 EMR Payhook Webhook Received:', { title, text, timestamp });
+
+    const fullContent = `${title || ''} ${text || ''}`;
+
+    // Extract numerical amounts from notification text
+    const foundAmounts = [];
+    const decimalRegex = /(?:₹|Rs\.?|INR)?\s*([\d]+\.[\d]{1,2})/gi;
+    let m;
+    while ((m = decimalRegex.exec(fullContent)) !== null) {
+      const val = parseFloat(m[1]);
+      if (!isNaN(val) && val > 0 && !foundAmounts.includes(val)) {
+        foundAmounts.push(val);
+      }
+    }
+    const integerRegex = /(?:Received|Paid|Deposited|Credited|₹|Rs\.?|INR)\s*([\d]+)/gi;
+    while ((m = integerRegex.exec(fullContent)) !== null) {
+      const val = parseFloat(m[1]);
+      if (!isNaN(val) && val > 0 && !foundAmounts.includes(val)) {
+        foundAmounts.push(val);
+      }
+    }
+
+    if (foundAmounts.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Could not extract any numerical payment amount from Payhook notification payload'
+      });
+    }
+
+    console.log('🔍 Extracted Payment Amounts from Payhook:', foundAmounts);
+
+    let matchingPayment = null;
+    let matchedAmount = null;
+    const now = new Date();
+
+    for (const amt of foundAmounts) {
+      const targetAmount = Number(Number(amt).toFixed(2));
+      const baseInteger = Math.floor(targetAmount);
+
+      // 1. Exact Amount Match in FormPayment
+      matchingPayment = await FormPayment.findOne({
+        exactAmount: { $gte: targetAmount - 0.005, $lte: targetAmount + 0.005 },
+        status: 'PENDING',
+        expiresAt: { $gt: now }
+      }).sort({ createdAt: -1 });
+
+      if (matchingPayment) {
+        matchedAmount = amt;
+        break;
+      }
+
+      // 2. Base Integer Match in FormPayment
+      matchingPayment = await FormPayment.findOne({
+        baseAmount: baseInteger,
+        status: 'PENDING',
+        expiresAt: { $gt: now }
+      }).sort({ createdAt: -1 });
+
+      if (matchingPayment) {
+        matchedAmount = amt;
+        break;
+      }
+    }
+
+    if (!matchingPayment) {
+      console.warn(`⚠️ No active PENDING FormPayment found matching amounts: ${foundAmounts.join(', ')}`);
+      return res.status(404).json({
+        success: false,
+        message: `No active PENDING payment session found matching amount(s): ₹${foundAmounts.join(', ₹')}`,
+        foundAmounts
+      });
+    }
+
+    // Update FormPayment to SUCCESS
+    matchingPayment.status = 'SUCCESS';
+    await matchingPayment.save();
+
+    // Also update Response if response exists
+    await Response.updateMany(
+      { 'paymentDetails.orderId': matchingPayment.orderId },
+      { $set: { paymentStatus: 'SUCCESS', 'paymentDetails.paidAt': new Date() } }
+    );
+
+    console.log(`🎉 Payment Successful for Form Payment Order ID: ${matchingPayment.orderId}`);
+
+    return res.json({
+      success: true,
+      message: 'Payment verified and status updated to SUCCESS',
+      orderId: matchingPayment.orderId,
+      matchedAmount,
+      payment: matchingPayment
+    });
+  } catch (error) {
+    console.error('Error processing Payhook webhook:', error);
+    res.status(500).json({ success: false, error: 'Failed to process webhook' });
+  }
+};
+
+// Admin approve/update response payment status
+export const updateResponsePaymentStatus = async (req, res) => {
+  try {
+    const { id: responseId } = req.params;
+    const { status } = req.body; // 'SUCCESS' or 'FAILED' or 'PENDING_VERIFICATION'
+
+    const response = await Response.findById(responseId);
+    if (!response) return res.status(404).json({ message: 'Response not found' });
+
+    response.paymentStatus = status;
+    if (status === 'SUCCESS') {
+      response.paymentDetails = response.paymentDetails || {};
+      response.paymentDetails.paidAt = new Date();
+    }
+    await response.save();
+
+    if (response.paymentDetails?.orderId) {
+      await FormPayment.findOneAndUpdate(
+        { orderId: response.paymentDetails.orderId },
+        { status }
+      );
+    }
+
+    res.json({ success: true, message: `Payment status updated to ${status}`, response });
+  } catch (error) {
+    console.error('Error updating response payment status:', error);
+    res.status(500).json({ message: 'Server error updating payment status' });
+  }
+};
+
 export const submitFormManualPaymentProof = async (req, res) => {
   try {
     const { id: formId } = req.params;

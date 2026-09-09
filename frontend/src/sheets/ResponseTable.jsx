@@ -381,6 +381,21 @@ export default function ResponseTable() {
     }
   };
 
+  const [previewImage, setPreviewImage] = useState(null);
+
+  const handleApprovePayment = async (responseId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.put(`${API_URL}/api/responses/${responseId}/payment-status`, { status: 'SUCCESS' }, {
+        headers: { Authorization: token }, withCredentials: true
+      });
+      toast.success('Payment approved successfully');
+      setResponses(prev => prev.map(r => r._id === responseId ? { ...r, paymentStatus: 'SUCCESS' } : r));
+    } catch (err) {
+      toast.error('Failed to approve payment');
+    }
+  };
+
   const allColumns = useMemo(() => {
     if (accessDenied || !form) return [];
     const baseCols = [
@@ -403,6 +418,82 @@ export default function ResponseTable() {
         Cell: ({ value }) => <div className="px-2 py-1 truncate text-[#202124]">{new Date(value).toLocaleString()}</div>,
       }
     ];
+
+    if (form.settings?.paymentRequired) {
+      baseCols.push({
+        Header: 'Payment Status',
+        id: 'paymentStatus',
+        accessor: (row) => row.paymentStatus || 'NOT_REQUIRED',
+        width: 170,
+        Cell: ({ row, value }) => {
+          const status = value || row.original.paymentStatus || 'NOT_REQUIRED';
+          return (
+            <div className="px-2 py-1 flex items-center gap-1.5 font-sans">
+              <span className={`px-2 py-0.5 rounded text-[11px] font-bold uppercase ${
+                status === 'SUCCESS' ? 'bg-green-100 text-green-800 border border-green-300' :
+                status === 'PENDING_VERIFICATION' ? 'bg-amber-100 text-amber-800 border border-amber-300' :
+                status === 'PENDING' ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                'bg-zinc-100 text-zinc-600'
+              }`}>
+                {status === 'PENDING_VERIFICATION' ? 'VERIFY PROOF' : status}
+              </span>
+              {status === 'PENDING_VERIFICATION' && hasAccess && (
+                <button
+                  onClick={() => handleApprovePayment(row.original._id)}
+                  className="px-1.5 py-0.5 bg-[#188038] hover:bg-[#137333] text-white text-[10px] font-bold rounded shadow-sm transition-all"
+                  title="Approve Payment"
+                >
+                  Approve
+                </button>
+              )}
+            </div>
+          );
+        }
+      });
+
+      baseCols.push({
+        Header: 'Amount Paid',
+        id: 'paymentAmount',
+        accessor: (row) => row.paymentDetails?.exactAmount || row.paymentDetails?.baseAmount || form.settings.paymentAmount || 0,
+        width: 120,
+        Cell: ({ row, value }) => {
+          const pd = row.original.paymentDetails || {};
+          return (
+            <div className="px-2 py-1 font-mono text-[12px] text-[#188038] font-bold">
+              ₹{pd.exactAmount ? pd.exactAmount.toFixed(2) : (value || 0)}
+            </div>
+          );
+        }
+      });
+
+      baseCols.push({
+        Header: 'Payment Proof / UTR',
+        id: 'paymentProof',
+        accessor: (row) => row.paymentDetails?.transactionId || '',
+        width: 220,
+        Cell: ({ row }) => {
+          const pd = row.original.paymentDetails || {};
+          return (
+            <div className="px-2 py-1 flex items-center gap-2 text-[12px]">
+              {pd.transactionId && (
+                <span className="font-mono text-zinc-700 bg-zinc-100 px-1.5 py-0.5 rounded text-[11px]" title={`Phone: ${pd.phoneNumber || 'N/A'}`}>
+                  UTR: {pd.transactionId}
+                </span>
+              )}
+              {pd.screenshotUrl && (
+                <button
+                  onClick={() => setPreviewImage(pd.screenshotUrl)}
+                  className="text-[#1a73e8] hover:underline font-semibold text-[11px] flex items-center gap-1"
+                >
+                  <Eye size={12} /> View Screenshot
+                </button>
+              )}
+              {!pd.transactionId && !pd.screenshotUrl && <span className="text-zinc-400">—</span>}
+            </div>
+          );
+        }
+      });
+    }
 
     form.sections.forEach(section => {
       section.elements.forEach(el => {
@@ -1198,6 +1289,26 @@ export default function ResponseTable() {
                 Save changes
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {previewImage && (
+        <div
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm flex items-center justify-center z-[120] p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div className="bg-white p-4 rounded-xl shadow-2xl max-w-2xl max-h-[90vh] flex flex-col items-center overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="w-full flex justify-between items-center mb-3 pb-2 border-b border-zinc-200">
+              <h3 className="font-bold text-zinc-800 text-sm">Payment Screenshot Proof</h3>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="text-zinc-500 hover:text-zinc-800 font-semibold px-2 py-1 bg-zinc-100 hover:bg-zinc-200 rounded text-xs"
+              >
+                Close
+              </button>
+            </div>
+            <img src={previewImage} alt="Payment Proof" className="max-w-full max-h-[75vh] object-contain rounded border border-zinc-200" />
           </div>
         </div>
       )}
