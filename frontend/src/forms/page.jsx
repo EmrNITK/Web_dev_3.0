@@ -336,8 +336,10 @@ export default function PublicForm() {
             if (res.data.status === 'SUCCESS') {
               setPaymentStatus('SUCCESS');
               clearInterval(pollingRef.current);
-              toast.success("Payment verified! Submitting form...");
-              handleSubmit(paymentSession.orderId);
+              toast.success("Payment verified successfully!");
+              setTimeout(() => {
+                handleSubmit(paymentSession.orderId);
+              }, 2500);
             } else if (res.data.status === 'EXPIRED') {
               setPaymentStatus('EXPIRED');
               clearInterval(pollingRef.current);
@@ -381,6 +383,7 @@ export default function PublicForm() {
 
   const handleSubmit = async (paymentOrderId = null) => {
     if (!validate() && !isPaymentStep) return;
+    if (isSubmitting || isSubmitted) return;
     setIsSubmitting(true);
 
     const processedAnswers = Object.entries(answers).map(([k, v]) => {
@@ -708,236 +711,244 @@ export default function PublicForm() {
             )}
           </div>
         ) : isPaymentStep && paymentSession ? (
-          /* MICROSOFT FLUENT STYLE PAYMENT STEP CARD */
-          <div className="space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-300">
-            {/* Top Microsoft Fluent Acrylic Header */}
-            <div className="relative bg-[#0b0e14]/90 backdrop-blur-xl border border-[#0078d4]/30 rounded-2xl p-6 sm:p-8 shadow-[0_12px_40px_rgba(0,120,212,0.15)] overflow-hidden">
-              {/* Microsoft Fluent Accent Top Line */}
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#0078d4] via-[#106ebe] to-[#00a4ef]" />
-
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-5">
-                <div className="flex items-center space-x-3.5">
-                  <div className="p-3 bg-[#0078d4]/15 border border-[#0078d4]/40 rounded-xl text-[#0078d4] shadow-sm">
-                    <CreditCard size={26} />
-                  </div>
+          /* CLEAN MICROSOFT FORMS STYLE PAYMENT STEP CARD */
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {paymentStatus === 'SUCCESS' ? (
+              <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-green-500 rounded-md p-8 text-center shadow-sm">
+                <CheckCircle2 className="text-green-500 w-12 h-12 mx-auto mb-3" />
+                <h2 className="text-xl font-bold text-white mb-1">Payment Received</h2>
+                <p className="text-sm text-zinc-400 mb-3">
+                  Payment of <span className="font-semibold text-white">₹{paymentSession.exactAmount.toFixed(2)}</span> has been successfully verified.
+                </p>
+                <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 mb-6 bg-[#0a0a0a] border border-zinc-800 py-2 px-4 rounded-md inline-flex">
+                  <Loader2 className="animate-spin w-3.5 h-3.5 text-[#0078d4]" />
+                  <span>Submitting your form response...</span>
+                </div>
+                <div>
+                  <Button
+                    onClick={() => handleSubmit(paymentSession.orderId)}
+                    disabled={isSubmitting}
+                    className="bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold h-9 text-sm px-6 rounded"
+                  >
+                    {isSubmitting && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
+                    Submit Now
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-[#0078d4] rounded-md p-5 sm:p-6 shadow-sm space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-xl font-bold text-white tracking-tight">Payment Verification</h2>
-                      <span className="text-[10px] uppercase tracking-wider font-extrabold bg-[#0078d4]/20 border border-[#0078d4]/40 text-[#00a4ef] px-2.5 py-0.5 rounded-full">
-                        Fluent Checkout
-                      </span>
-                    </div>
-                    <p className="text-xs text-zinc-400 mt-0.5">
+                    <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                      <CreditCard className="text-[#0078d4]" size={20} />
+                      Payment Required
+                    </h2>
+                    <p className="text-xs text-zinc-400 mt-1">
                       {paymentSession.instruction || "Complete UPI payment to finish form submission"}
                     </p>
                   </div>
-                </div>
-
-                <div className="self-start sm:self-auto bg-[#0078d4]/10 border border-[#0078d4]/30 text-[#00a4ef] text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00a4ef] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0078d4]"></span>
-                  </span>
-                  <span>Auto Polling Active</span>
-                </div>
-              </div>
-
-              {/* Amount Hero Card */}
-              <div className="mt-6 bg-[#07090e] border border-white/10 p-6 rounded-xl text-center relative overflow-hidden group shadow-inner">
-                <div className="absolute inset-0 bg-gradient-to-b from-[#0078d4]/10 via-transparent to-transparent opacity-60 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                <span className="text-[11px] text-zinc-400 uppercase tracking-widest font-semibold block mb-1">
-                  Exact Tracked Amount
-                </span>
-                <div className="text-4xl sm:text-5xl font-black text-white tracking-tight drop-shadow-[0_2px_12px_rgba(0,120,212,0.4)]">
-                  ₹{paymentSession.exactAmount.toFixed(2)}
-                </div>
-                <div className="mt-2.5 inline-flex items-center gap-2 px-3 py-1 bg-[#0078d4]/15 border border-[#0078d4]/30 rounded-full text-xs font-mono text-[#00a4ef]">
-                  <span>Base: ₹{paymentSession.baseAmount}.00</span>
-                  <span className="text-zinc-500">•</span>
-                  <span>Offset Assigned for Instant Verification</span>
-                </div>
-              </div>
-
-              {/* Interactive QR Code Display */}
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-[#0078d4] to-[#00a4ef] rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
-                  <div className="relative bg-white p-5 rounded-2xl shadow-2xl border border-white/40 flex items-center justify-center">
-                    <QRCodeSVG value={paymentSession.upiUrl} size={210} level="H" includeMargin={true} />
-                  </div>
-                </div>
-                <p className="text-xs text-zinc-400 flex items-center gap-1.5 font-medium mt-1">
-                  <QrCode size={15} className="text-[#0078d4]" /> Scan with Google Pay, PhonePe, Paytm, or any UPI App
-                </p>
-              </div>
-
-              {/* Merchant Details Card with Quick Copy */}
-              <div className="mt-6 bg-[#07090e]/80 p-4 rounded-xl border border-white/10 text-xs space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <span className="text-zinc-400">Merchant Name:</span>
-                  <span className="font-semibold text-white">{paymentSession.merchantName}</span>
-                </div>
-
-                <div className="flex justify-between items-center pt-1 border-t border-white/5">
-                  <span className="text-zinc-400">Merchant UPI ID:</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium text-[#00a4ef] bg-[#0078d4]/10 px-2 py-0.5 rounded border border-[#0078d4]/20">
-                      {paymentSession.merchantUpiId}
+                  <div className="bg-[#0078d4]/10 border border-[#0078d4]/30 text-[#0078d4] text-xs font-medium px-2.5 py-1 rounded flex items-center gap-1.5 shrink-0">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0078d4] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0078d4]"></span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(paymentSession.merchantUpiId);
-                        setCopiedUpi(true);
-                        toast.success("UPI ID copied to clipboard!");
-                        setTimeout(() => setCopiedUpi(false), 2000);
-                      }}
-                      className="p-1 text-zinc-400 hover:text-white bg-white/5 hover:bg-white/10 rounded transition-colors"
-                      title="Copy UPI ID"
-                    >
-                      {copiedUpi ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                    </button>
+                    <span>Waiting for payment...</span>
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center pt-1 border-t border-white/5">
-                  <span className="text-zinc-400">Order Reference:</span>
-                  <span className="font-mono text-zinc-400">{paymentSession.orderId}</span>
+                {/* Amount Display */}
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-md p-4 text-center">
+                  <span className="text-[11px] text-zinc-400 uppercase font-medium tracking-wider">
+                    Amount to Pay
+                  </span>
+                  <div className="text-3xl font-bold text-white mt-0.5">
+                    ₹{paymentSession.exactAmount.toFixed(2)}
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-1">
+                    Base: ₹{paymentSession.baseAmount}.00 (Includes verification code)
+                  </p>
                 </div>
-              </div>
 
-              {/* Quick UPI App Intent Buttons */}
-              <div className="mt-6 space-y-3">
-                <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
-                  Tap to Pay Directly with App:
-                </label>
-
-                {/* Main Default UPI Button */}
-                <a
-                  href={paymentSession.upiUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full bg-[#0078d4] hover:bg-[#106ebe] active:bg-[#005a9e] text-white text-xs font-bold py-3.5 px-4 rounded-xl text-center flex items-center justify-center gap-2.5 shadow-[0_4px_20px_rgba(0,120,212,0.3)] transition-all transform hover:-translate-y-0.5"
-                >
-                  <UpiIcon />
-                  <span>Open Default UPI App</span>
-                  <ExternalLink size={14} className="ml-auto opacity-70" />
-                </a>
-
-                {/* Specific App Grid with Real Logomark Icons */}
-                <div className="grid grid-cols-3 gap-2.5 pt-1">
-                  <a
-                    href={getAppDeepLink('gpay', paymentSession.upiUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-[#131722] hover:bg-[#1c2232] border border-white/10 hover:border-[#4285F4]/50 text-white text-xs font-semibold p-3 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm"
-                  >
-                    <GooglePayIcon />
-                    <span className="group-hover:text-[#4285F4] transition-colors text-[11px]">Google Pay</span>
-                  </a>
-
-                  <a
-                    href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-[#131722] hover:bg-[#1c2232] border border-white/10 hover:border-[#5f259f]/50 text-white text-xs font-semibold p-3 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm"
-                  >
-                    <PhonePeIcon />
-                    <span className="group-hover:text-[#a062db] transition-colors text-[11px]">PhonePe</span>
-                  </a>
-
-                  <a
-                    href={getAppDeepLink('paytm', paymentSession.upiUrl)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-[#131722] hover:bg-[#1c2232] border border-white/10 hover:border-[#00BAF2]/50 text-white text-xs font-semibold p-3 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all group shadow-sm"
-                  >
-                    <PaytmIcon />
-                    <span className="group-hover:text-[#00BAF2] transition-colors text-[11px]">Paytm</span>
-                  </a>
+                {/* QR Code */}
+                <div className="flex flex-col items-center gap-2 pt-1">
+                  <div className="bg-white p-4 rounded-md border border-zinc-700 shadow-sm flex items-center justify-center">
+                    <QRCodeSVG value={paymentSession.upiUrl} size={190} level="H" includeMargin={false} />
+                  </div>
+                  <p className="text-xs text-zinc-400 flex items-center gap-1.5 mt-1 font-medium">
+                    <QrCode size={14} className="text-[#0078d4]" /> Scan with Google Pay, PhonePe, Paytm, or BHIM
+                  </p>
                 </div>
-              </div>
 
-              {/* Manual Proof Verification Accordion */}
-              <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
-                <button
-                  type="button"
-                  onClick={() => setShowManualProof(!showManualProof)}
-                  className="w-full text-xs font-semibold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 p-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-sm"
-                >
-                  <HelpCircle size={15} className="text-amber-400" />
-                  <span>Payment completed but status not updating?</span>
-                </button>
-
-                {showManualProof && (
-                  <form onSubmit={handleManualProofSubmit} className="bg-[#07090e] p-5 rounded-xl border border-amber-500/20 space-y-4 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="border-b border-white/10 pb-3">
-                      <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider flex items-center gap-2">
-                        <ShieldCheck size={16} /> Manual Payment Verification
-                      </h4>
-                      <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
-                        If your payment was completed via bank app but hasn't auto-verified yet, submit your transaction details below for immediate admin review.
-                      </p>
+                {/* Merchant Details & Copy UPI */}
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-md p-4 text-xs space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-400">Merchant Name</span>
+                    <span className="font-medium text-zinc-200">{paymentSession.merchantName}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-800/80">
+                    <span className="text-zinc-400">Merchant UPI ID</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-zinc-200 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-800">
+                        {paymentSession.merchantUpiId}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(paymentSession.merchantUpiId);
+                          setCopiedUpi(true);
+                          toast.success("UPI ID copied!");
+                          setTimeout(() => setCopiedUpi(false), 2000);
+                        }}
+                        className="h-7 px-2 border-zinc-800 bg-zinc-900 text-zinc-300 hover:bg-zinc-800 text-xs"
+                      >
+                        {copiedUpi ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                      </Button>
                     </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-800/80">
+                    <span className="text-zinc-400">Order ID</span>
+                    <span className="font-mono text-zinc-400">{paymentSession.orderId}</span>
+                  </div>
+                </div>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-zinc-200 font-medium block">
-                        Payment Screenshot Proof
-                      </label>
-                      <FileUploadInput
-                        value={manualScreenshot}
-                        onChange={(url) => setManualScreenshot(url)}
-                        label={<>Upload screenshot or <span className="text-[#0078d4]">browse</span></>}
-                      />
-                    </div>
+                {/* Quick App Intent Buttons */}
+                <div className="space-y-2 pt-1">
+                  <label className="text-xs font-semibold text-zinc-300">
+                    Pay with App
+                  </label>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-zinc-200 font-medium flex items-center gap-1">
-                        <Hash size={13} className="text-[#0078d4]" /> UTR / Bank Transaction Reference <span className="text-red-400">*</span>
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. 425091827364"
-                        value={manualTxnId}
-                        onChange={(e) => setManualTxnId(e.target.value)}
-                        required
-                        className="bg-[#0b0e14] border-white/10 h-10 text-xs text-white focus:border-[#0078d4]"
-                      />
-                    </div>
+                  <a
+                    href={paymentSession.upiUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full bg-[#0078d4] hover:bg-[#005a9e] text-white text-sm font-semibold h-9 rounded flex items-center justify-center gap-2 shadow-sm transition-colors"
+                  >
+                    <UpiIcon />
+                    <span>Open Default UPI App</span>
+                    <ExternalLink size={14} className="opacity-70" />
+                  </a>
 
-                    <div className="space-y-1.5">
-                      <label className="text-xs text-zinc-200 font-medium flex items-center gap-1">
-                        <Phone size={13} className="text-[#0078d4]" /> Contact Phone Number <span className="text-red-400">*</span>
-                      </label>
-                      <Input
-                        type="text"
-                        placeholder="e.g. 9876543210"
-                        value={manualPhone}
-                        onChange={(e) => setManualPhone(e.target.value)}
-                        required
-                        className="bg-[#0b0e14] border-white/10 h-10 text-xs text-white focus:border-[#0078d4]"
-                      />
-                    </div>
-
-                    <Button
-                      type="submit"
-                      disabled={isSubmittingManual}
-                      className="w-full bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-black font-bold text-xs h-10 rounded-xl shadow-md transition-all"
+                  <div className="grid grid-cols-3 gap-2">
+                    <a
+                      href={getAppDeepLink('gpay', paymentSession.upiUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white text-xs h-9 rounded flex items-center justify-center gap-2 transition-colors"
                     >
-                      {isSubmittingManual ? <Loader2 className="animate-spin mr-2" size={15} /> : <Send size={15} className="mr-2" />}
-                      Submit Verification Proof & Finish Form
-                    </Button>
-                  </form>
-                )}
-              </div>
+                      <GooglePayIcon />
+                      <span>Google Pay</span>
+                    </a>
 
-              {/* Footer Actions */}
-              <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                <Button variant="outline" onClick={handleBack} className="h-9 px-4 text-xs font-semibold border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10 rounded-xl">
-                  <ChevronLeft size={16} className="mr-1" /> Return to Questions
-                </Button>
+                    <a
+                      href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white text-xs h-9 rounded flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <PhonePeIcon />
+                      <span>PhonePe</span>
+                    </a>
+
+                    <a
+                      href={getAppDeepLink('paytm', paymentSession.upiUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white text-xs h-9 rounded flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <PaytmIcon />
+                      <span>Paytm</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Manual Proof Section */}
+                <div className="pt-4 border-t border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowManualProof(!showManualProof)}
+                    className="text-xs text-zinc-400 hover:text-zinc-200 underline flex items-center gap-1.5"
+                  >
+                    <HelpCircle size={14} />
+                    <span>Payment done but status not updating? Submit proof manually</span>
+                  </button>
+
+                  {showManualProof && (
+                    <form onSubmit={handleManualProofSubmit} className="bg-[#0a0a0a] border border-zinc-800 rounded-md p-4 space-y-4 mt-3">
+                      <div>
+                        <h4 className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                          <ShieldCheck size={14} className="text-[#0078d4]" /> Manual Payment Verification
+                        </h4>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                          Submit your UTR / Transaction ID and phone number for manual verification by the admin.
+                        </p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-zinc-300 font-medium block">
+                          Payment Screenshot
+                        </label>
+                        <FileUploadInput
+                          value={manualScreenshot}
+                          onChange={(url) => setManualScreenshot(url)}
+                          label={<>Upload screenshot or <span className="text-[#0078d4]">browse</span></>}
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-zinc-300 font-medium block">
+                          UTR / Transaction Reference ID <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          type="text"
+                          placeholder="e.g. 425091827364"
+                          value={manualTxnId}
+                          onChange={(e) => setManualTxnId(e.target.value)}
+                          required
+                          className="bg-[#050505] border-zinc-800 h-9 text-xs text-zinc-100 focus-visible:ring-[#0078d4]"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs text-zinc-300 font-medium block">
+                          Phone Number <span className="text-red-500">*</span>
+                        </label>
+                        <Input
+                          type="text"
+                          placeholder="e.g. 9876543210"
+                          value={manualPhone}
+                          onChange={(e) => setManualPhone(e.target.value)}
+                          required
+                          className="bg-[#050505] border-zinc-800 h-9 text-xs text-zinc-100 focus-visible:ring-[#0078d4]"
+                        />
+                      </div>
+
+                      <Button
+                        type="submit"
+                        disabled={isSubmittingManual}
+                        className="bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold h-9 text-xs rounded w-full"
+                      >
+                        {isSubmittingManual && <Loader2 className="animate-spin mr-2 w-3.5 h-3.5" />}
+                        Submit Payment Proof
+                      </Button>
+                    </form>
+                  )}
+                </div>
+
+                {/* Navigation Footer */}
+                <div className="flex items-center justify-between pt-4 border-t border-zinc-800">
+                  <Button
+                    variant="outline"
+                    onClick={handleBack}
+                    className="h-9 text-sm border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900"
+                  >
+                    <ChevronLeft size={16} className="mr-1" /> Back
+                  </Button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ) : (
           /* STANDARD FORM QUESTIONS STEP */
