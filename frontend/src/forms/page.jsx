@@ -62,19 +62,22 @@ const UpiIcon = () => (
 // ---------------------------------------------------------------------------
 // UPI deep-link handling
 // ---------------------------------------------------------------------------
-// Bare custom schemes (tez://, phonepe://, paytmmp://) are unreliable:
-// - Google deprecated the old "tez" scheme after the GPay rebrand; many
-//   current GPay installs no longer register it, so the OS silently drops
-//   the intent or opens a broken/legacy flow.
-// - Regex-stripping "upi://pay?" and re-gluing the query string onto a new
-//   scheme doesn't re-normalize encoding. If the source upiUrl has a `tn`
-//   (transaction note) with spaces/special characters, or an unencoded
-//   amount, the destination app can reject the payload as an invalid link,
-//   which surfaces to the user as "payment failed" even though the app
-//   opened.
-// - On Android, the current reliable way to force-open a *specific* app is
-//   an intent:// URL with an explicit target package and a browser
-//   fallback, not a raw custom scheme.
+// A QR code is just an image: whatever string is embedded in it, the paying
+// app decodes and parses on its own, tolerating things like unencoded
+// spaces or a loose "&" in the transaction note. `window.location.href =
+// someLink` is real browser navigation, which follows strict URI rules — if
+// the source `upiUrl` has any unencoded character in `pn` (payee name) or
+// `tn` (transaction note), the browser can silently mangle or truncate the
+// URL on navigation. The receiving app then gets an incomplete payload
+// (missing merchant fields, wrong mode, etc.) and falls back to a generic
+// flow instead of a direct merchant payment — which is exactly what
+// produces misleading messages like PhonePe's "scan from gallery" limit or
+// GPay's "exceeded bank limit" for a tiny amount that works fine via QR.
+//
+// Fix: never reuse the raw query string. Parse every param out, decode it
+// (in case it's already partially encoded), then re-encode cleanly before
+// rebuilding any link. This makes the deep link correct regardless of how
+// the backend formatted the original upiUrl.
 const UPI_PACKAGES = {
   gpay: 'com.google.android.apps.nbu.paisa.user',
   phonepe: 'com.phonepe.app',
@@ -84,25 +87,56 @@ const UPI_PACKAGES = {
 const isAndroid = () => typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
 const isIOS = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
 
-// Extract the query string from a upi://pay?... URL without mangling encoding.
-const getUpiQueryString = (rawUpiUrl) => {
-  try {
-    const parsed = new URL(rawUpiUrl);
-    return parsed.search.startsWith('?') ? parsed.search.slice(1) : parsed.search;
-  } catch {
-    // Fallback for environments where `upi://` isn't parsed as a valid URL
-    return rawUpiUrl.replace(/^upi:\/\/pay\?/, '');
+// Pull key/value pairs out of a upi://pay?... string without relying on the
+// strict URL parser (which can throw on unencoded spaces) or on the source
+// string's encoding being correct.
+const parseUpiParams = (rawUpiUrl) => {
+  if (!rawUpiUrl) return {};
+  const queryPart = rawUpiUrl.split('?')[1] || '';
+  const params = {};
+  queryPart.split('&').forEach((pair) => {
+    if (!pair) return;
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) return;
+    const rawKey = pair.slice(0, eqIdx);
+    const rawVal = pair.slice(eqIdx + 1);
+    let key;
+    let val;
+    try { key = decodeURIComponent(rawKey.replace(/\+/g, ' ')).trim(); } catch { key = rawKey.trim(); }
+    try { val = decodeURIComponent(rawVal.replace(/\+/g, ' ')).trim(); } catch { val = rawVal.trim(); }
+    if (key) params[key] = val;
+  });
+  return params;
+};
+
+// Rebuild a clean, correctly percent-encoded UPI query string from a
+// (possibly messy) source upiUrl.
+const buildCleanUpiQuery = (rawUpiUrl) => {
+  const params = parseUpiParams(rawUpiUrl);
+
+  // Normalize the amount to exactly 2 decimal places — some apps reject or
+  // misinterpret "1.2" or "1" where "1.20"/"1.00" is expected.
+  if (params.am !== undefined && params.am !== '') {
+    const numeric = Number(params.am);
+    if (!Number.isNaN(numeric)) {
+      params.am = numeric.toFixed(2);
+    }
   }
+
+  return Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== '')
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
 };
 
 const getAppDeepLink = (app, rawUpiUrl) => {
   if (!rawUpiUrl) return '#';
-  const query = getUpiQueryString(rawUpiUrl);
+  const query = buildCleanUpiQuery(rawUpiUrl);
 
   if (isAndroid()) {
     const pkg = UPI_PACKAGES[app];
     if (!pkg) return rawUpiUrl;
-    const fallback = encodeURIComponent(rawUpiUrl);
+    const fallback = encodeURIComponent(`upi://pay?${query}`);
     // intent:// with an explicit package reliably targets one app on Android
     // and falls back to the generic upi:// chooser if the app isn't installed.
     return `intent://pay?${query}#Intent;scheme=upi;package=${pkg};S.browser_fallback_url=${fallback};end`;
