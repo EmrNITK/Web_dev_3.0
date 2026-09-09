@@ -39,7 +39,6 @@ const PhonePeIcon = () => (
       d="M10.206 9.941h2.949v4.692c-.402.201-.938.268-1.34.268-1.072 0-1.609-.536-1.609-1.743V9.941zm13.47 4.816c-1.523 6.449-7.985 10.442-14.433 8.919C2.794 22.154-1.199 15.691.324 9.243 1.847 2.794 8.309-1.199 14.757.324c6.449 1.523 10.442 7.985 8.919 14.433zm-6.231-5.888a.887.887 0 0 0-.871-.871h-1.609l-3.686-4.222c-.335-.402-.871-.536-1.407-.402l-1.274.401c-.201.067-.268.335-.134.469l4.021 3.82H6.386c-.201 0-.335.134-.335.335v.67c0 .469.402.871.871.871h.938v3.217c0 2.413 1.273 3.82 3.418 3.82.67 0 1.206-.067 1.877-.335v2.145c0 .603.469 1.072 1.072 1.072h.938a.432.432 0 0 0 .402-.402V9.874h1.542c.201 0 .335-.134.335-.335v-.67z"
       fill="#5F259F"
     />
-
   </svg>
 );
 
@@ -50,7 +49,6 @@ const PaytmIcon = () => (
     <path d="M106.8 286.5c0 15.3.2 30.7-.1 46-.2 11.8-3 22.5-14.4 28.8-4.6 2.5-9.6 3.9-14.8 4-11.5.2-23 0-34.5.2-2.8 0-3.4-1-3.3-3.5.2-4.2-.1-8.3.1-12.5.2-8 6.3-14.1 14.3-14.4 5.2-.2 10.3-.1 15.5 0 4.2 0 6.5-1.7 6.5-6.2 0-4.6-2.2-6.2-6.4-6.3-7-.2-14 .8-20.9-1.2-11.9-3.5-20.6-13.4-20.9-25.7-.6-19.5-.2-39-.3-58.5 0-2.2.7-2.9 2.9-2.8 8.2.1 16.3.2 24.5 0 3.6-.1 3.1 1.9 3.1 4.1 0 14.7 0 29.3 0 44 0 6.4 3 9.8 8.6 10 6.6.2 9.5-2.5 9.5-9.2 0-14.8.1-29.7-.1-44.5 0-3.5.9-4.5 4.4-4.4 7.3.3 14.7.4 22 0 4-.2 4.6 1.3 4.5 4.8C106.7 254.9 106.8 270.7 106.8 286.5z" fill="#02b9ef" />
     <path d="M-148 309.2c0-16.3 0-32.7 0-49 0-16 9.8-26 25.9-25.8 10.5.1 21-1.2 31.4.8 13.3 2.6 21.7 12.9 21.8 26.6.1 14.5 0 29 0 43.5 0 18.2-10.7 29.3-28.9 29.8-5.5.2-11 .1-16.5 0-2.5-.1-3.6.7-3.5 3.4.2 4 .1 8 0 12-.2 8.6-6.3 14.8-14.8 14.9-5 .1-11.3 2.1-14.5-.8-3-2.7-.8-9.1-.9-13.9C-148.1 336.9-148 323-148 309.2zM-117.8 284.7c0 3.2 0 6.3 0 9.5 0 11.3 0 11.3 11.3 10.3 4.9-.4 7.2-2.8 7.3-7.7.1-5.6-.2-11.3.1-16.9.6-16.2-2.4-14.6-15.6-14.7-2.4 0-3.2.7-3.2 3.1C-117.7 273.7-117.8 279.2-117.8 284.7z" fill="#06306f" />
     <path d="M135.1,309.4c0-13.3-0.1-26.7,0.1-40c0-3.1-0.7-4.4-4.1-4.3c-4.5,0.2-10.5,1.5-13-0.7c-3.1-2.9-.7-9.1-1.1-13.9c0-0.3,0-0.7,0-1c0-4.7-1.5-10.2,0.5-13.7s8.1-1.3,12.4-2.4c8.5-2.2,14.9-7.1,20.1-13.9c3.6-4.6,8.1-7.9,13.9-9c3.1-0.6,5-0.2,4.8,3.8c-0.3,5.6,0,11.3-0.1,17c-0.1,2.4,0.8,3.2,3.2,3.1c4-0.1,8,0.1,12-0.1c2.4-0.1,3.2,0.8,3.1,3.2c-0.1,8.2-0.1,16.3,0,24.5c0,2.3-.6,3.5-3.1,3.2c-.5-.1-1,0-1.5,0c-4.4.4-10.5-2-12.8,1c-2.2,2.8-.8,8.6-.8,13.1c0,27.2-.1,54.3.1,81.5c0,3.8-1,5-4.8,4.7c-3.6-.3-7.3,0-11-0.1c-10.8-.4-17.9-7.7-17.9-18.5C135.1,334.4,135.1,321.9,135.1,309.4z" fill="#02b9ef" />
-
   </svg>
 );
 
@@ -61,13 +59,75 @@ const UpiIcon = () => (
   </svg>
 );
 
-const getAppDeepLink = (app, rawUpiUrl) => {
-  return rawUpiUrl || '#';
+// ---------------------------------------------------------------------------
+// UPI deep-link handling
+// ---------------------------------------------------------------------------
+// Bare custom schemes (tez://, phonepe://, paytmmp://) are unreliable:
+// - Google deprecated the old "tez" scheme after the GPay rebrand; many
+//   current GPay installs no longer register it, so the OS silently drops
+//   the intent or opens a broken/legacy flow.
+// - Regex-stripping "upi://pay?" and re-gluing the query string onto a new
+//   scheme doesn't re-normalize encoding. If the source upiUrl has a `tn`
+//   (transaction note) with spaces/special characters, or an unencoded
+//   amount, the destination app can reject the payload as an invalid link,
+//   which surfaces to the user as "payment failed" even though the app
+//   opened.
+// - On Android, the current reliable way to force-open a *specific* app is
+//   an intent:// URL with an explicit target package and a browser
+//   fallback, not a raw custom scheme.
+const UPI_PACKAGES = {
+  gpay: 'com.google.android.apps.nbu.paisa.user',
+  phonepe: 'com.phonepe.app',
+  paytm: 'net.one97.paytm',
 };
 
-const handleAppPay = (app, rawUpiUrl, e) => {
-  if (!rawUpiUrl) return;
-  window.location.href = rawUpiUrl;
+const isAndroid = () => typeof navigator !== 'undefined' && /android/i.test(navigator.userAgent);
+const isIOS = () => typeof navigator !== 'undefined' && /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+// Extract the query string from a upi://pay?... URL without mangling encoding.
+const getUpiQueryString = (rawUpiUrl) => {
+  try {
+    const parsed = new URL(rawUpiUrl);
+    return parsed.search.startsWith('?') ? parsed.search.slice(1) : parsed.search;
+  } catch {
+    // Fallback for environments where `upi://` isn't parsed as a valid URL
+    return rawUpiUrl.replace(/^upi:\/\/pay\?/, '');
+  }
+};
+
+const getAppDeepLink = (app, rawUpiUrl) => {
+  if (!rawUpiUrl) return '#';
+  const query = getUpiQueryString(rawUpiUrl);
+
+  if (isAndroid()) {
+    const pkg = UPI_PACKAGES[app];
+    if (!pkg) return rawUpiUrl;
+    const fallback = encodeURIComponent(rawUpiUrl);
+    // intent:// with an explicit package reliably targets one app on Android
+    // and falls back to the generic upi:// chooser if the app isn't installed.
+    return `intent://pay?${query}#Intent;scheme=upi;package=${pkg};S.browser_fallback_url=${fallback};end`;
+  }
+
+  if (isIOS()) {
+    // iOS app-specific schemes only work if the app is installed and still
+    // registers that scheme; these have changed across app versions, so
+    // treat them as best-effort and always keep the QR / generic link as
+    // a fallback path in the UI.
+    switch (app) {
+      case 'gpay':
+        return `gpay://upi/pay?${query}`;
+      case 'phonepe':
+        return `phonepe://pay?${query}`;
+      case 'paytm':
+        return `paytmmp://pay?${query}`;
+      default:
+        return rawUpiUrl;
+    }
+  }
+
+  // Desktop / unknown UA: nothing sensible to deep-link to, hand back the
+  // generic UPI URL (mostly useful for debugging / copy).
+  return rawUpiUrl;
 };
 
 const FileUploadInput = ({ el, value, onChange, hasError, label }) => {
@@ -186,6 +246,7 @@ export default function PublicForm() {
   const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
   const pollingRef = useRef(null);
+  const appOpenTimerRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ answers, otherValues, respondentEmail, currentSectionIndex, sectionHistory }));
@@ -464,6 +525,31 @@ export default function PublicForm() {
       setIsSubmittingManual(false);
     }
   };
+
+  // Handle a UPI app button tap: navigate to the app deep link, and if the
+  // tab is still visible shortly after (i.e. nothing actually opened), tell
+  // the user instead of leaving them stuck on a silent failure.
+  const handleUpiAppClick = (app) => {
+    if (!paymentSession?.upiUrl) return;
+    const link = getAppDeepLink(app, paymentSession.upiUrl);
+    const clickedAt = Date.now();
+
+    if (appOpenTimerRef.current) clearTimeout(appOpenTimerRef.current);
+
+    window.location.href = link;
+
+    appOpenTimerRef.current = setTimeout(() => {
+      if (document.visibilityState === 'visible' && Date.now() - clickedAt < 3000) {
+        toast.error(`Couldn't open the app. Try scanning the QR code, or use "Copy UPI ID" and pay manually.`);
+      }
+    }, 1500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (appOpenTimerRef.current) clearTimeout(appOpenTimerRef.current);
+    };
+  }, []);
 
   const renderInput = (el) => {
     const val = answers[el.id] || '';
@@ -805,33 +891,36 @@ export default function PublicForm() {
                   </label>
 
                   <div className="grid grid-cols-3 gap-2.5">
-                    <a
-                      href={getAppDeepLink('gpay', paymentSession.upiUrl)}
-                      onClick={(e) => handleAppPay('gpay', paymentSession.upiUrl, e)}
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => handleUpiAppClick('gpay')}
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
                     >
                       <GooglePayIcon />
-                      <span>Google Pay</span>
-                    </a>
+                      <span>GPay</span>
+                    </button>
 
-                    <a
-                      href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
-                      onClick={(e) => handleAppPay('phonepe', paymentSession.upiUrl, e)}
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => handleUpiAppClick('phonepe')}
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
                     >
                       <PhonePeIcon />
                       <span>PhonePe</span>
-                    </a>
+                    </button>
 
-                    <a
-                      href={getAppDeepLink('paytm', paymentSession.upiUrl)}
-                      onClick={(e) => handleAppPay('paytm', paymentSession.upiUrl, e)}
-                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => handleUpiAppClick('paytm')}
+                      className="bg-[#0a0a0a] hover:bg-zinc-900 border border-zinc-800 text-zinc-200 hover:text-white text-xs h-10 rounded-md flex items-center justify-center gap-2 transition-colors font-medium shadow-sm"
                     >
                       <PaytmIcon />
                       <span>Paytm</span>
-                    </a>
+                    </button>
                   </div>
+                  <p className="text-[11px] text-zinc-500 pt-0.5">
+                    If an app doesn't open or the payment doesn't go through, use the QR code above or copy the UPI ID instead.
+                  </p>
                 </div>
 
                 {/* Manual Proof Section */}
