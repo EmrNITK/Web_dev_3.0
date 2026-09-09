@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { format } from "date-fns";
 import { useDropzone } from 'react-dropzone';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   Loader2, ChevronLeft, UploadCloud, Calendar as CalendarIcon,
   Clock, AlertCircle, Home, FileText, ShieldCheck, Info,
-  HomeIcon, Lock
+  HomeIcon, Lock, CreditCard, ExternalLink, RefreshCw, CheckCircle2,
+  HelpCircle, Send, Phone, Hash, QrCode
 } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { cn } from "@/lib/utils";
@@ -20,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 
-const FileUploadInput = ({ el, value, onChange, hasError }) => {
+const FileUploadInput = ({ el, value, onChange, hasError, label }) => {
   const [status, setStatus] = useState(value ? 'success' : 'idle');
   const [progress, setProgress] = useState(0);
   const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api`;
@@ -29,8 +31,9 @@ const FileUploadInput = ({ el, value, onChange, hasError }) => {
     const file = acceptedFiles[0];
     if (!file) return;
 
-    if (el.fileRestrictions?.maxSizeMB && (file.size / (1024 * 1024)) > el.fileRestrictions.maxSizeMB) {
-      toast.error(`Exceeds maximum size of ${el.fileRestrictions.maxSizeMB}MB`);
+    const maxSize = el?.fileRestrictions?.maxSizeMB || 10;
+    if ((file.size / (1024 * 1024)) > maxSize) {
+      toast.error(`Exceeds maximum size of ${maxSize}MB`);
       return;
     }
 
@@ -52,7 +55,7 @@ const FileUploadInput = ({ el, value, onChange, hasError }) => {
       setStatus('error');
       toast.error("Upload failed.");
     }
-  }, [onChange, el.fileRestrictions, API_URL]);
+  }, [onChange, el?.fileRestrictions, API_URL]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, disabled: status === 'uploading' });
 
@@ -68,7 +71,7 @@ const FileUploadInput = ({ el, value, onChange, hasError }) => {
     );
   }
 
-  if (status === 'success') {
+  if (status === 'success' && value) {
     return (
       <div className="flex items-center justify-between w-full bg-[#0078d4]/10 border border-[#0078d4]/30 rounded-md p-2.5">
         <div className="flex items-center space-x-2">
@@ -88,8 +91,8 @@ const FileUploadInput = ({ el, value, onChange, hasError }) => {
     )}>
       <input {...getInputProps()} />
       <UploadCloud className="text-zinc-400 mb-2" size={20} />
-      <p className="text-sm font-medium text-zinc-300">Drag file or <span className="text-[#0078d4]">browse</span></p>
-      <p className="text-xs text-zinc-500 mt-1">Max: {el.fileRestrictions?.maxSizeMB || 10}MB</p>
+      <p className="text-sm font-medium text-zinc-300">{label || <>Drag file or <span className="text-[#0078d4]">browse</span></>}</p>
+      <p className="text-xs text-zinc-500 mt-1">Max: {el?.fileRestrictions?.maxSizeMB || 10}MB</p>
     </div>
   );
 };
@@ -110,7 +113,19 @@ export default function PublicForm() {
   const [submissionResult, setSubmissionResult] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [requestCopy, setRequestCopy] = useState(false);
-  const [systemTime, setSystemTime] = useState(new Date());
+
+  // Payment states
+  const [isPaymentStep, setIsPaymentStep] = useState(false);
+  const [isInitializingPayment, setIsInitializingPayment] = useState(false);
+  const [paymentSession, setPaymentSession] = useState(null);
+  const [paymentStatus, setPaymentStatus] = useState('PENDING');
+
+  // Manual proof state
+  const [showManualProof, setShowManualProof] = useState(false);
+  const [manualScreenshot, setManualScreenshot] = useState('');
+  const [manualTxnId, setManualTxnId] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [isSubmittingManual, setIsSubmittingManual] = useState(false);
 
   const [currentSectionIndex, setCurrentSectionIndex] = useState(() => JSON.parse(localStorage.getItem(storageKey))?.currentSectionIndex || 0);
   const [answers, setAnswers] = useState(() => JSON.parse(localStorage.getItem(storageKey))?.answers || {});
@@ -121,10 +136,7 @@ export default function PublicForm() {
   const [domainRestricted, setDomainRestricted] = useState(false);
   const API_URL = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
-  useEffect(() => {
-    const timer = setInterval(() => setSystemTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  const pollingRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ answers, otherValues, respondentEmail, currentSectionIndex, sectionHistory }));
@@ -183,9 +195,7 @@ export default function PublicForm() {
               setHasAlreadySubmitted(true);
               localStorage.setItem(`submitted_${id}`, 'true');
             }
-          } catch (err) {
-            
-          }
+          } catch (err) {}
         }
       }
 
@@ -249,11 +259,81 @@ export default function PublicForm() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleNext = () => { if (validate()) { setSectionHistory([...sectionHistory, currentSectionIndex]); setCurrentSectionIndex(currentSectionIndex + 1); window.scrollTo(0, 0); } };
-  const handleBack = () => { const hist = [...sectionHistory]; const prev = hist.pop(); setSectionHistory(hist); setCurrentSectionIndex(prev); window.scrollTo(0, 0); };
+  // Initiate Payment Session
+  const initiatePaymentSession = async () => {
+    setIsInitializingPayment(true);
+    try {
+      const res = await axios.post(`${API_URL}/forms/public/${id}/create-payment`);
+      if (res.data.success) {
+        setPaymentSession(res.data);
+        setPaymentStatus('PENDING');
+        setIsPaymentStep(true);
+        window.scrollTo(0, 0);
+      } else {
+        toast.error(res.data.message || "Failed to initialize payment");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Payment initiation error");
+    } finally {
+      setIsInitializingPayment(false);
+    }
+  };
 
-  const handleSubmit = async () => {
+  // Polling Payment Status
+  useEffect(() => {
+    if (isPaymentStep && paymentSession?.orderId && paymentStatus === 'PENDING') {
+      pollingRef.current = setInterval(async () => {
+        try {
+          const res = await axios.get(`${API_URL}/forms/public/${id}/payment-status/${paymentSession.orderId}`);
+          if (res.data.success) {
+            if (res.data.status === 'SUCCESS') {
+              setPaymentStatus('SUCCESS');
+              clearInterval(pollingRef.current);
+              toast.success("Payment verified! Submitting form...");
+              handleSubmit(paymentSession.orderId);
+            } else if (res.data.status === 'EXPIRED') {
+              setPaymentStatus('EXPIRED');
+              clearInterval(pollingRef.current);
+            }
+          }
+        } catch (err) {
+          console.error("Payment polling error:", err);
+        }
+      }, 2500);
+    } else {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    }
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [isPaymentStep, paymentSession, paymentStatus, API_URL, id]);
+
+  const handleNext = () => {
     if (!validate()) return;
+    if (currentSectionIndex === form.sections.length - 1 && form.settings.paymentRequired) {
+      initiatePaymentSession();
+    } else {
+      setSectionHistory([...sectionHistory, currentSectionIndex]);
+      setCurrentSectionIndex(currentSectionIndex + 1);
+      window.scrollTo(0, 0);
+    }
+  };
+
+  const handleBack = () => {
+    if (isPaymentStep) {
+      setIsPaymentStep(false);
+      return;
+    }
+    const hist = [...sectionHistory];
+    const prev = hist.pop();
+    setSectionHistory(hist);
+    setCurrentSectionIndex(prev);
+    window.scrollTo(0, 0);
+  };
+
+  const handleSubmit = async (paymentOrderId = null) => {
+    if (!validate() && !isPaymentStep) return;
     setIsSubmitting(true);
 
     const processedAnswers = Object.entries(answers).map(([k, v]) => {
@@ -270,9 +350,11 @@ export default function PublicForm() {
       const response = await axios.post(`${API_URL}/forms/public/${id}`, {
         answers: processedAnswers,
         respondentEmail,
-        requestCopy
+        requestCopy,
+        paymentOrderId
       }, {
-       withCredentials: true});
+        withCredentials: true
+      });
       
       setSubmissionResult(response.data);
       setIsSubmitted(true);
@@ -282,6 +364,63 @@ export default function PublicForm() {
       toast.error(err.response?.data?.message || "Submission error"); 
     } finally { 
       setIsSubmitting(false); 
+    }
+  };
+
+  // Submit Manual Payment Proof
+  const handleManualProofSubmit = async (e) => {
+    e.preventDefault();
+    if (!manualTxnId || !manualPhone) {
+      toast.error("Please provide both Transaction ID (UTR) and Phone Number.");
+      return;
+    }
+
+    setIsSubmittingManual(true);
+
+    const processedAnswers = Object.entries(answers).map(([k, v]) => {
+      let finalValue = v;
+      if (typeof v === 'string' && v.startsWith('__OTHER__')) {
+        finalValue = otherValues[k] || 'Other';
+      } else if (Array.isArray(v)) {
+        finalValue = v.map(item => item.startsWith('__OTHER__') ? (otherValues[k] || 'Other') : item);
+      }
+      return { questionId: k, value: finalValue };
+    });
+
+    try {
+      const res = await axios.post(`${API_URL}/forms/public/${id}/manual-payment-proof`, {
+        orderId: paymentSession?.orderId || '',
+        screenshotUrl: manualScreenshot,
+        transactionId: manualTxnId,
+        phoneNumber: manualPhone,
+        answers: processedAnswers,
+        respondentEmail,
+        requestCopy
+      }, { withCredentials: true });
+
+      if (res.data.success) {
+        setSubmissionResult({
+          message: res.data.message || "Your response and payment proof have been submitted for verification."
+        });
+        setIsSubmitted(true);
+        localStorage.removeItem(storageKey);
+        localStorage.setItem(`submitted_${id}`, 'true');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to submit payment proof");
+    } finally {
+      setIsSubmittingManual(false);
+    }
+  };
+
+  const getAppDeepLink = (appScheme, upiUrl) => {
+    if (!upiUrl) return '#';
+    const params = upiUrl.replace('upi://pay?', '');
+    switch (appScheme) {
+      case 'gpay': return `gpay://upi/pay?${params}`;
+      case 'phonepe': return `phonepe://pay?${params}`;
+      case 'paytm': return `paytmmp://pay?${params}`;
+      default: return upiUrl;
     }
   };
 
@@ -504,8 +643,8 @@ export default function PublicForm() {
 
         {isSubmitted ? (
           <div className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-8 text-center">
-            <ShieldCheck className="text-green-500 w-10 h-10 mx-auto mb-4" />
-            <h1 className="text-xl font-bold text-white mb-2">Success</h1>
+            <ShieldCheck className="text-green-500 w-12 h-12 mx-auto mb-4" />
+            <h1 className="text-xl font-bold text-white mb-2">Submission Successful</h1>
             <p className="text-sm text-zinc-400 mb-6 whitespace-pre-wrap">
               {submissionResult?.message || "Your response has been recorded."}
             </p>
@@ -521,7 +660,173 @@ export default function PublicForm() {
               <Button onClick={() => window.location.reload()} className="bg-zinc-200 text-black hover:bg-white h-9 text-sm font-semibold">Submit another response</Button>
             )}
           </div>
+        ) : isPaymentStep && paymentSession ? (
+          /* PAYMENT STEP CARD */
+          <div className="space-y-4">
+            <div className="bg-[#0c0c0c] border border-zinc-800 border-t-4 border-t-[#51b749] rounded-md p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+                <div className="flex items-center space-x-3">
+                  <CreditCard className="text-[#51b749]" size={28} />
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Payment Required</h2>
+                    <p className="text-xs text-zinc-400">{paymentSession.instruction || "Complete UPI payment to finish form submission"}</p>
+                  </div>
+                </div>
+
+                <div className="bg-[#13703a]/20 border border-[#51b749]/30 text-[#51b749] text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1.5">
+                  <RefreshCw className="animate-spin" size={12} /> Auto Polling
+                </div>
+              </div>
+
+              {/* Amount Hero Card */}
+              <div className="bg-[#050505] border border-zinc-800 p-5 rounded-lg text-center space-y-1">
+                <span className="text-xs text-zinc-400 uppercase tracking-widest font-semibold">Exact Amount to Pay</span>
+                <div className="text-4xl font-extrabold text-white">₹{paymentSession.exactAmount.toFixed(2)}</div>
+                <p className="text-xs text-[#51b749] font-mono">
+                  Base Amount: ₹{paymentSession.baseAmount} (Tracked Amount)
+                </p>
+              </div>
+
+              {/* QR Code */}
+              <div className="flex flex-col items-center gap-3 py-2">
+                <div className="bg-white p-4 rounded-xl shadow-xl border border-zinc-300">
+                  <QRCodeSVG value={paymentSession.upiUrl} size={200} level="H" includeMargin={true} />
+                </div>
+                <p className="text-xs text-zinc-400 flex items-center gap-1">
+                  <QrCode size={14} className="text-[#51b749]" /> Scan with any UPI app on your mobile device
+                </p>
+              </div>
+
+              {/* Merchant Details */}
+              <div className="bg-zinc-950 p-4 rounded-md border border-zinc-800 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Merchant Name:</span>
+                  <span className="font-semibold text-zinc-200">{paymentSession.merchantName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Merchant UPI ID:</span>
+                  <span className="font-mono text-zinc-200">{paymentSession.merchantUpiId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-500">Order Ref:</span>
+                  <span className="font-mono text-zinc-400">{paymentSession.orderId}</span>
+                </div>
+              </div>
+
+              {/* UPI App Intent Buttons */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-zinc-400 block">Pay Directly via App:</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <a
+                    href={paymentSession.upiUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="col-span-2 bg-[#51b749] hover:bg-[#38984c] text-white text-xs font-bold p-3 rounded-md text-center flex items-center justify-center gap-2 transition-all"
+                  >
+                    <ExternalLink size={14} /> Open Default UPI App
+                  </a>
+                  <a
+                    href={getAppDeepLink('gpay', paymentSession.upiUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-400 text-xs font-bold p-2.5 rounded-md text-center"
+                  >
+                    Google Pay
+                  </a>
+                  <a
+                    href={getAppDeepLink('phonepe', paymentSession.upiUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-400 text-xs font-bold p-2.5 rounded-md text-center"
+                  >
+                    PhonePe
+                  </a>
+                  <a
+                    href={getAppDeepLink('paytm', paymentSession.upiUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-sky-600/20 hover:bg-sky-600/30 border border-sky-500/40 text-sky-400 text-xs font-bold p-2.5 rounded-md text-center col-span-2"
+                  >
+                    Paytm
+                  </a>
+                </div>
+              </div>
+
+              {/* Manual Verification Fallback Button */}
+              <div className="pt-4 border-t border-zinc-800 space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setShowManualProof(!showManualProof)}
+                  className="w-full text-xs font-semibold text-yellow-400 hover:text-yellow-300 bg-yellow-500/10 border border-yellow-500/20 p-2.5 rounded-md flex items-center justify-center gap-2 transition-colors"
+                >
+                  <HelpCircle size={14} /> Payment done but not showing here?
+                </button>
+
+                {showManualProof && (
+                  <form onSubmit={handleManualProofSubmit} className="bg-zinc-950 p-4 rounded-md border border-zinc-800 space-y-3">
+                    <h4 className="text-xs font-bold text-zinc-200 uppercase tracking-wider">Manual Payment Verification</h4>
+                    <p className="text-[11px] text-zinc-400">
+                      Upload your payment screenshot and UTR transaction ID for manual admin approval.
+                    </p>
+
+                    <div className="space-y-1">
+                      <label className="text-xs text-zinc-300 font-semibold">Payment Screenshot</label>
+                      <FileUploadInput
+                        value={manualScreenshot}
+                        onChange={(url) => setManualScreenshot(url)}
+                        label={<>Upload screenshot or <span className="text-[#0078d4]">browse</span></>}
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs text-zinc-300 font-semibold flex items-center gap-1">
+                        <Hash size={12} className="text-[#51b749]" /> UTR / Transaction ID <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. 123456789012"
+                        value={manualTxnId}
+                        onChange={(e) => setManualTxnId(e.target.value)}
+                        required
+                        className="bg-[#0a0a0a] border-zinc-800 h-9 text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs text-zinc-300 font-semibold flex items-center gap-1">
+                        <Phone size={12} className="text-[#51b749]" /> Contact Phone Number <span className="text-red-500">*</span>
+                      </label>
+                      <Input
+                        type="text"
+                        placeholder="e.g. 9876543210"
+                        value={manualPhone}
+                        onChange={(e) => setManualPhone(e.target.value)}
+                        required
+                        className="bg-[#0a0a0a] border-zinc-800 h-9 text-xs"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      disabled={isSubmittingManual}
+                      className="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold text-xs h-9"
+                    >
+                      {isSubmittingManual ? <Loader2 className="animate-spin mr-2" size={14} /> : <Send size={14} className="mr-1.5" />}
+                      Submit Proof & Complete Form
+                    </Button>
+                  </form>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <Button variant="outline" onClick={handleBack} className="h-9 text-sm border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900">
+                  <ChevronLeft size={16} className="mr-1" /> Back
+                </Button>
+              </div>
+            </div>
+          </div>
         ) : (
+          /* STANDARD FORM QUESTIONS STEP */
           <div className="space-y-4">
             <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-[#0078d4] rounded-md shadow-sm overflow-hidden">
               {form.coverPhoto && <img className='w-full' src={form.coverPhoto} />}
@@ -606,9 +911,15 @@ export default function PublicForm() {
               <Button variant="outline" onClick={handleBack} disabled={currentSectionIndex === 0} className="h-9 text-sm border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900 disabled:opacity-0">
                 <ChevronLeft size={16} className="mr-1" /> Back
               </Button>
-              <Button onClick={currentSectionIndex === form.sections.length - 1 ? handleSubmit : handleNext} disabled={isSubmitting} className="h-9 text-sm bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold px-6 rounded">
-                {isSubmitting && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
-                {currentSectionIndex === form.sections.length - 1 ? "Submit" : "Next"}
+              <Button
+                onClick={currentSectionIndex === form.sections.length - 1 ? (form.settings.paymentRequired ? handleNext : () => handleSubmit()) : handleNext}
+                disabled={isSubmitting || isInitializingPayment}
+                className="h-9 text-sm bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold px-6 rounded"
+              >
+                {(isSubmitting || isInitializingPayment) && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
+                {currentSectionIndex === form.sections.length - 1
+                  ? (form.settings.paymentRequired ? "Proceed to Payment" : "Submit")
+                  : "Next"}
               </Button>
             </div>
           </div>

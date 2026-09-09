@@ -15,7 +15,7 @@ import {
     Download, BarChart, PieChart, CheckCircle, XCircle, Check,
     Sheet, PlusIcon, Search,
     // Missing icons added:
-    Trophy, Lock, ShieldAlert
+    Trophy, Lock, ShieldAlert, CreditCard, QrCode
 } from 'lucide-react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import RichMarkdownEditor from '../components/MarkdownEditor';
@@ -107,6 +107,12 @@ export default function FormBuilder({ initialFormId = null }) {
             shuffleQuestionOrder: false,
             confirmationMessage: "Your response has been recorded.",
             requireNitkkrDomain: false, // added
+            paymentRequired: false,
+            paymentAmount: 0,
+            merchantUpiId: '',
+            merchantName: '',
+            paymentOffsetMode: 'SUB_OFFSET',
+            paymentInstruction: 'Scan the QR code or tap an app below to complete payment.'
         }
     });
 
@@ -1125,6 +1131,89 @@ export default function FormBuilder({ initialFormId = null }) {
                                             value={form.settings.defaultQuestionPoints}
                                             onChange={(e) => updateSettings('defaultQuestionPoints', parseInt(e.target.value) || 0)}
                                             className="w-24 p-3 border border-white/10 rounded-lg bg-black text-[#51b749] font-bold focus:border-[#51b749] outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Payment Settings */}
+                        <div className="bg-[#111111] p-6 md:p-8 rounded-2xl shadow-xl border border-white/10">
+                            <div className="flex justify-between items-center mb-6">
+                                <div>
+                                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                        <CreditCard size={20} className="text-[#51b749]"/> Payment Required
+                                    </h3>
+                                    <p className="text-sm text-white/50 mt-1">Require responders to complete a UPI payment before submitting this form.</p>
+                                </div>
+                                <button
+                                    onClick={() => updateSettings('paymentRequired', !form.settings.paymentRequired)}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${form.settings.paymentRequired ? 'bg-[#51b749]' : 'bg-white/20'}`}
+                                >
+                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.settings.paymentRequired ? 'translate-x-6' : 'translate-x-1'}`} />
+                                </button>
+                            </div>
+
+                            {form.settings.paymentRequired && (
+                                <div className="pl-6 border-l-2 border-[#51b749]/30 space-y-5 pt-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-2 text-white/80 uppercase tracking-wider">Payment Amount (₹)</label>
+                                            <input
+                                                type="number" min="1" step="1"
+                                                value={form.settings.paymentAmount || ''}
+                                                onChange={(e) => updateSettings('paymentAmount', parseFloat(e.target.value) || 0)}
+                                                placeholder="e.g. 100"
+                                                className="w-full p-3 border border-white/10 rounded-lg bg-black text-white font-bold focus:border-[#51b749] outline-none"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-2 text-white/80 uppercase tracking-wider">Amount Offset Range</label>
+                                            <select
+                                                value={form.settings.paymentOffsetMode || 'SUB_OFFSET'}
+                                                onChange={(e) => updateSettings('paymentOffsetMode', e.target.value)}
+                                                className="w-full p-3 border border-white/10 rounded-lg bg-black text-white focus:border-[#51b749] outline-none"
+                                            >
+                                                <option value="SUB_OFFSET">99 - 100 Range (e.g. ₹99.01 – ₹99.99 for ₹100)</option>
+                                                <option value="ADD_OFFSET">100 - 101 Range (e.g. ₹100.01 – ₹100.99 for ₹100)</option>
+                                            </select>
+                                            <p className="text-[11px] text-white/40 mt-1">Prevents duplicate pending amounts for unique tracking.</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-2 text-white/80 uppercase tracking-wider">Merchant UPI ID</label>
+                                            <input
+                                                type="text"
+                                                value={form.settings.merchantUpiId || ''}
+                                                onChange={(e) => updateSettings('merchantUpiId', e.target.value)}
+                                                placeholder="e.g. 7903565147@ybl"
+                                                className="w-full p-3 border border-white/10 rounded-lg bg-black text-white focus:border-[#51b749] outline-none"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-2 text-white/80 uppercase tracking-wider">Merchant Name</label>
+                                            <input
+                                                type="text"
+                                                value={form.settings.merchantName || ''}
+                                                onChange={(e) => updateSettings('merchantName', e.target.value)}
+                                                placeholder="e.g. NITKKR EMR Club"
+                                                className="w-full p-3 border border-white/10 rounded-lg bg-black text-white focus:border-[#51b749] outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-sm font-semibold mb-2 text-white/80 uppercase tracking-wider">Payment Instructions</label>
+                                        <input
+                                            type="text"
+                                            value={form.settings.paymentInstruction || ''}
+                                            onChange={(e) => updateSettings('paymentInstruction', e.target.value)}
+                                            placeholder="Instruction for respondent"
+                                            className="w-full p-3 border border-white/10 rounded-lg bg-black text-white focus:border-[#51b749] outline-none"
                                         />
                                     </div>
                                 </div>

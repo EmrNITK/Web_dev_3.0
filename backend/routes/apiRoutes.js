@@ -16,7 +16,10 @@ import {
   checkExistingSubmission,
   getAccessRequests,
   deleteAccessRequest,
-  getFormResponses2
+  getFormResponses2,
+  initiateFormPayment,
+  checkFormPaymentStatus,
+  submitFormManualPaymentProof
 } from '../controllers/formController.js';
 import * as teamCtrl from '../controllers/teamController.js';
 import * as responseController from '../controllers/responseController.js';
@@ -37,6 +40,9 @@ router.get('/team/years', publicCtrl.getTeamYears);
 router.get('/team', teamCtrl.getTeam);
 router.get('/forms/public/:id', getPublicForm);
 router.post('/forms/public/:id', submitFormResponse);
+router.post('/forms/public/:id/create-payment', initiateFormPayment);
+router.get('/forms/public/:id/payment-status/:orderId', checkFormPaymentStatus);
+router.post('/forms/public/:id/manual-payment-proof', submitFormManualPaymentProof);
 
 router.post('/options', auth, genericCtrl.createOption);
 router.delete('/options/:type/:value', auth, genericCtrl.deleteOption);

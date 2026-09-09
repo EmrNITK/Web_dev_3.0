@@ -2,13 +2,215 @@ import Form from '../models/Form.js';
 import Response from '../models/Response.js';
 import User from '../models/User.js';
 import AccessRequest from '../models/AccessRequest.js';
+import FormPayment from '../models/FormPayment.js';
 import { sendEmail } from '../utils/sendEmail.js';
 import jwt from 'jsonwebtoken';
+
+// Helper to generate unique tracked amount for form payments
+async function generateUniqueFormPaymentAmount(formId, baseAmount, mode = 'SUB_OFFSET') {
+  const base = Math.floor(baseAmount);
+  const now = new Date();
+
+  // Find active pending payments for this form & base amount
+  const activePayments = await FormPayment.find({
+    formId,
+    baseAmount: base,
+    status: 'PENDING',
+    expiresAt: { $gt: now }
+  });
+
+  const activeOffsets = new Set();
+  activePayments.forEach((p) => {
+    let offset = 0;
+    if (mode === 'SUB_OFFSET') {
+      // Sub-offset range e.g. 99.01 - 99.99 for 100
+      offset = Math.round((p.exactAmount - (base - 1)) * 100);
+    } else {
+      // Add-offset range e.g. 100.01 - 100.99 for 100
+      offset = Math.round((p.exactAmount - base) * 100);
+    }
+    if (offset > 0 && offset < 100) activeOffsets.add(offset);
+  });
+
+  let candidateOffset = Math.floor(Math.random() * 99) + 1;
+  let attempts = 0;
+  while (activeOffsets.has(candidateOffset) && attempts < 99) {
+    candidateOffset = (candidateOffset % 99) + 1;
+    attempts++;
+  }
+
+  let finalAmount = 0;
+  if (mode === 'SUB_OFFSET') {
+    finalAmount = (base - 1) + (candidateOffset / 100);
+  } else {
+    finalAmount = base + (candidateOffset / 100);
+  }
+
+  return Number(finalAmount.toFixed(2));
+}
+
+// ---------------- PAYMENT API CONTROLLERS ----------------
+
+export const initiateFormPayment = async (req, res) => {
+  try {
+    const { id: formId } = req.params;
+    const form = await Form.findById(formId);
+
+    if (!form) return res.status(404).json({ message: 'Form not found' });
+    if (!form.settings.paymentRequired) {
+      return res.status(400).json({ message: 'Payment is not required for this form.' });
+    }
+
+    const baseAmount = form.settings.paymentAmount || 0;
+    if (baseAmount <= 0) {
+      return res.status(400).json({ message: 'Invalid form payment amount configured.' });
+    }
+
+    const upiId = (form.settings.merchantUpiId || '7903565147@ybl').trim();
+    const upiName = (form.settings.merchantName || 'EMR Payment Services').trim();
+    const offsetMode = form.settings.paymentOffsetMode || 'SUB_OFFSET';
+
+    const timestamp = Date.now();
+    const randomHex = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const orderId = `F-ORD-${timestamp}-${randomHex}`;
+    const txnRef = `TXN${timestamp}${Math.floor(Math.random() * 1000)}`;
+
+    const exactAmount = await generateUniqueFormPaymentAmount(formId, baseAmount, offsetMode);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins expiry
+
+    const upiUrl = `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(upiName)}&am=${exactAmount.toFixed(2)}&tr=${txnRef}&tn=${encodeURIComponent('Order ' + orderId)}&cu=INR`;
+
+    const payment = new FormPayment({
+      formId,
+      orderId,
+      txnRef,
+      baseAmount,
+      exactAmount,
+      merchantUpiId: upiId,
+      merchantName: upiName,
+      status: 'PENDING',
+      upiUrl,
+      expiresAt
+    });
+
+    await payment.save();
+
+    res.status(201).json({
+      success: true,
+      orderId,
+      txnRef,
+      baseAmount,
+      exactAmount,
+      merchantUpiId: upiId,
+      merchantName: upiName,
+      upiUrl,
+      expiresAt,
+      instruction: form.settings.paymentInstruction || 'Scan the QR code or tap an app below to complete payment.'
+    });
+  } catch (error) {
+    console.error('Error initiating form payment:', error);
+    res.status(500).json({ message: 'Server error initiating payment' });
+  }
+};
+
+export const checkFormPaymentStatus = async (req, res) => {
+  try {
+    const { id: formId, orderId } = req.params;
+    const payment = await FormPayment.findOne({ formId, orderId });
+
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment order not found' });
+    }
+
+    if (payment.status === 'PENDING' && new Date() > new Date(payment.expiresAt)) {
+      payment.status = 'EXPIRED';
+      await payment.save();
+    }
+
+    res.json({
+      success: true,
+      orderId: payment.orderId,
+      status: payment.status,
+      exactAmount: payment.exactAmount,
+      baseAmount: payment.baseAmount,
+      paymentDetails: payment
+    });
+  } catch (error) {
+    console.error('Error checking payment status:', error);
+    res.status(500).json({ message: 'Server error checking payment status' });
+  }
+};
+
+export const submitFormManualPaymentProof = async (req, res) => {
+  try {
+    const { id: formId } = req.params;
+    const { orderId, screenshotUrl, transactionId, phoneNumber, answers, respondentEmail, requestCopy } = req.body;
+
+    const form = await Form.findById(formId);
+    if (!form) return res.status(404).json({ message: 'Form not found' });
+
+    let payment = await FormPayment.findOne({ formId, orderId });
+    if (payment) {
+      payment.status = 'PENDING_VERIFICATION';
+      payment.manualProof = {
+        screenshotUrl: screenshotUrl || '',
+        transactionId: transactionId || '',
+        phoneNumber: phoneNumber || '',
+        submittedAt: new Date()
+      };
+      await payment.save();
+    }
+
+    // Determine respondent email
+    let targetEmail = respondentEmail || '';
+    const token = req.cookies?.token || req.headers?.authorization;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.id).select('-password');
+        if (user) targetEmail = user.email;
+      } catch (e) {}
+    }
+
+    // Process answers & scores
+    const allQuestions = form.sections.flatMap((s) => s.elements);
+    const questionMap = new Map(allQuestions.map((q) => [q.id, q]));
+
+    const newResponse = new Response({
+      formId,
+      userId: req.user ? req.user.id : null,
+      answers,
+      respondentEmail: form.settings.collectEmails !== 'DO_NOT_COLLECT' ? targetEmail : null,
+      paymentStatus: 'PENDING_VERIFICATION',
+      paymentDetails: {
+        orderId: orderId || '',
+        txnRef: payment ? payment.txnRef : '',
+        baseAmount: payment ? payment.baseAmount : form.settings.paymentAmount,
+        exactAmount: payment ? payment.exactAmount : form.settings.paymentAmount,
+        screenshotUrl: screenshotUrl || '',
+        transactionId: transactionId || '',
+        phoneNumber: phoneNumber || '',
+        paidAt: new Date()
+      }
+    });
+
+    await newResponse.save();
+
+    res.status(201).json({
+      success: true,
+      message: form.settings.confirmationMessage || 'Your response and payment proof have been submitted for verification.',
+      paymentStatus: 'PENDING_VERIFICATION'
+    });
+  } catch (error) {
+    console.error('Error submitting manual payment proof:', error);
+    res.status(500).json({ message: 'Server error submitting manual payment proof' });
+  }
+};
 
 export const submitFormResponse = async (req, res) => {
   try {
     const { id: formId } = req.params;
-    const { answers, respondentEmail, requestCopy } = req.body;
+    const { answers, respondentEmail, requestCopy, paymentOrderId } = req.body;
 
     const form = await Form.findById(formId);
     if (!form) return res.status(404).json({ message: "Form not found" });
@@ -20,9 +222,9 @@ export const submitFormResponse = async (req, res) => {
     let targetEmail = '';
     if (!token){
       if(respondentEmail){
-        targetEmail = targetEmail;
+        targetEmail = respondentEmail;
       }
-    }{
+    } else {
        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         const user = await User.findById(decoded.id).select('-password -otp -collegeOtp');
         if(user){
@@ -32,6 +234,26 @@ export const submitFormResponse = async (req, res) => {
     if (form.settings.limitToOneResponse && targetEmail) {
       const existing = await Response.findOne({ formId, respondentEmail: targetEmail });
       if (existing) return res.status(403).json({ message: "You have already submitted a response." });
+    }
+
+    // Payment verification check
+    let paymentStatus = 'NOT_REQUIRED';
+    let paymentDetailsPayload = {};
+
+    if (form.settings.paymentRequired) {
+      if (paymentOrderId) {
+        const paymentDoc = await FormPayment.findOne({ formId, orderId: paymentOrderId });
+        if (paymentDoc) {
+          paymentStatus = paymentDoc.status;
+          paymentDetailsPayload = {
+            orderId: paymentDoc.orderId,
+            txnRef: paymentDoc.txnRef,
+            baseAmount: paymentDoc.baseAmount,
+            exactAmount: paymentDoc.exactAmount,
+            paidAt: new Date()
+          };
+        }
+      }
     }
 
     let totalScore = 0;
@@ -73,7 +295,9 @@ export const submitFormResponse = async (req, res) => {
       answers: scoredAnswers,
       respondentEmail: form.settings.collectEmails !== 'DO_NOT_COLLECT' ? targetEmail : null,
       totalScore,
-      maxScore
+      maxScore,
+      paymentStatus,
+      paymentDetails: paymentDetailsPayload
     });
 
     await newResponse.save();

@@ -78,7 +78,14 @@ const FormSchema = new mongoose.Schema({
     acceptingResponses: { type: Boolean, default: true },
     showProgressBar: { type: Boolean, default: false },
     shuffleQuestionOrder: { type: Boolean, default: false },
-    confirmationMessage: { type: String, default: 'Your response has been recorded.' }
+    confirmationMessage: { type: String, default: 'Your response has been recorded.' },
+    // Payment Settings
+    paymentRequired: { type: Boolean, default: false },
+    paymentAmount: { type: Number, default: 0 },
+    merchantUpiId: { type: String, default: '' },
+    merchantName: { type: String, default: '' },
+    paymentOffsetMode: { type: String, enum: ['SUB_OFFSET', 'ADD_OFFSET'], default: 'SUB_OFFSET' },
+    paymentInstruction: { type: String, default: 'Scan the QR code or tap an app below to complete payment.' }
   },
   sections: [SectionSchema],
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

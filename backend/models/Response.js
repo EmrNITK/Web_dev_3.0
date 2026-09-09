@@ -16,6 +16,21 @@ const ResponseSchema = new mongoose.Schema({
   maxScore: { type: Number, default: 0 },
   remark: {type: String, default: ''},
   color: {type: String, default: 'no-color'},
+  paymentStatus: {
+    type: String,
+    enum: ['NOT_REQUIRED', 'PENDING', 'SUCCESS', 'PENDING_VERIFICATION', 'FAILED'],
+    default: 'NOT_REQUIRED'
+  },
+  paymentDetails: {
+    orderId: { type: String, default: '' },
+    txnRef: { type: String, default: '' },
+    baseAmount: { type: Number, default: 0 },
+    exactAmount: { type: Number, default: 0 },
+    screenshotUrl: { type: String, default: '' },
+    transactionId: { type: String, default: '' },
+    phoneNumber: { type: String, default: '' },
+    paidAt: { type: Date, default: null }
+  }
 }, { timestamps: true });
 
 export default mongoose.model('Response', ResponseSchema);
