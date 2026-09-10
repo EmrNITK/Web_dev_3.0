@@ -886,10 +886,6 @@ export default function PublicForm() {
 
                 {/* Merchant Details & Copy UPI */}
                 <div className="bg-[#0a0a0a] border border-zinc-800 rounded-md p-4 text-xs space-y-2.5">
-                  <div className="flex justify-between items-center">
-                    <span className="text-zinc-400">Merchant Name</span>
-                    <span className="font-medium text-zinc-200">{paymentSession.merchantName}</span>
-                  </div>
                   <div className="flex justify-between items-center pt-2 border-t border-zinc-800/80">
                     <span className="text-zinc-400">Merchant UPI ID</span>
                     <div className="flex items-center gap-2">
@@ -919,7 +915,7 @@ export default function PublicForm() {
                 </div>
 
                 {/* Quick App Intent Buttons */}
-                <div className="space-y-2 pt-1">
+                <div style={{ display: 'none' }} className="space-y-2 pt-1 hidden">
                   <label className="text-xs font-semibold text-zinc-300 block">
                     Pay directly with App:
                   </label>

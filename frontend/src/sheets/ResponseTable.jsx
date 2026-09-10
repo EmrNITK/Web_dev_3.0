@@ -536,7 +536,23 @@ export default function ResponseTable() {
       id: 'remark',
       accessor: 'remark',
       width: 200,
-      Cell: ({ row, value }) => <CellRenderer value={value} row={row} columnId="remark" colName="Remark" colType="text" isCoreField={true} />
+      Cell: ({ row, value }) => (
+        <CellRenderer
+          value={value}
+          row={row}
+          columnId="remark"
+          colName="Remark"
+          colType="text"
+          isCoreField={true}
+          focusedCell={focusedCell}
+          setFocusedCell={setFocusedCell}
+          editingCell={editingCell}
+          setEditingCell={setEditingCell}
+          setConfirmModal={setConfirmModal}
+          setFormulaValue={setFormulaValue}
+          hasAccess={hasAccess}
+        />
+      )
     });
 
     return baseCols;
