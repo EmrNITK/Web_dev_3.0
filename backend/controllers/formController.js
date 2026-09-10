@@ -586,7 +586,7 @@ export const deleteResponse = async (req, res) => {
 export const getForms = async (req, res) => {
   try {
     const forms = await Form.find()
-      .select('title description createdAt updatedAt settings.acceptingResponses')
+      .select('title description coverPhoto createdAt updatedAt settings.acceptingResponses')
       .sort({ updatedAt: -1 });
     res.status(200).json(forms);
   } catch (error) {

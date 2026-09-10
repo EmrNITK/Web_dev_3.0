@@ -1043,7 +1043,15 @@ export default function PublicForm() {
           /* STANDARD FORM QUESTIONS STEP */
           <div className="space-y-4">
             <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-[#0078d4] rounded-md shadow-sm overflow-hidden">
-              {form.coverPhoto && <img className='w-full' src={form.coverPhoto} />}
+              {form.coverPhoto && (
+                <div className="w-full h-40 sm:h-52 overflow-hidden">
+                  <img
+                    src={form.coverPhoto}
+                    alt="Form cover"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
               <div className='p-5'>
                 <h1 className="text-xl font-bold text-white tracking-tight">{form.title}</h1>
                 {form.description && (
