@@ -21,6 +21,24 @@ const turndownService = new TurndownService({
   bulletListMarker: '-',
 });
 
+// Preserve blank lines: an empty <p> or <div> (or one with only <br>) becomes \n\n
+turndownService.addRule('blankLine', {
+  filter: (node) => {
+    if (node.nodeName !== 'P' && node.nodeName !== 'DIV') return false;
+    const text = node.textContent.trim();
+    // Check if it only contains whitespace / br
+    const hasOnlyBr = node.children.length === 1 && node.children[0].nodeName === 'BR';
+    return text === '' || hasOnlyBr;
+  },
+  replacement: () => '\n\n',
+});
+
+// Convert standalone <br> tags into a newline
+turndownService.addRule('lineBreak', {
+  filter: 'br',
+  replacement: () => '  \n',
+});
+
 turndownService.addRule('resizableImage', {
   filter: 'img',
   replacement: function (content, node) {
@@ -52,7 +70,7 @@ const RichMarkdownEditor = ({ initialValue = "", onChange }) => {
 
   useEffect(() => {
     if (editorRef.current && initialValue && !editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = marked.parse(preprocessMarkdown(initialValue));
+      editorRef.current.innerHTML = marked.parse(preprocessMarkdown(initialValue), { breaks: true });
     }
   }, [initialValue]);
 

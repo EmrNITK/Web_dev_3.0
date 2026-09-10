@@ -17,7 +17,7 @@ export default function MarkdownRenderer({ content, className = "" }) {
   const processedContent = preprocessMarkdown(content);
   
   // Parse to HTML and force all links to open in a new blank tab
-  let rawHtml = marked.parse(processedContent);
+  let rawHtml = marked.parse(processedContent, { breaks: true });
   rawHtml = rawHtml.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 
   return (
