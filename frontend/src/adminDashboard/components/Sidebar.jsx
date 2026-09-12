@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Calendar, Images, Users, Cpu, DollarSign, LogOut, SheetIcon, Menu, X, Users2 } from 'lucide-react';
+import { LayoutDashboard, Calendar, Images, Users, Cpu, DollarSign, LogOut, SheetIcon, Menu, X, Users2, QrCode } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +22,7 @@ const Sidebar = () => {
     { name: 'Projects', icon: LayoutDashboard, path: '/admin/projects' },
     { name: 'Team', icon: Users, path: '/admin/team' },
     { name: 'Sponsors', icon: DollarSign, path: '/admin/sponsors' },
+    { name: 'QR Maker', icon: QrCode, path: '/admin/qrmaker' },
   ];
 
   return (

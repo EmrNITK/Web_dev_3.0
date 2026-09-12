@@ -40,6 +40,7 @@ export default function FormBuilder({ initialFormId = null }) {
     const navigate = useNavigate();
     const [newResponseCount, setNewResponseCount] = useState(0);
     const [formId, setFormId] = useState(initialFormId || urlFormId);
+    const [fetchError, setFetchError] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isLoading, setIsLoading] = useState(!!formId);
     const [activeTab, setActiveTab] = useState('questions');
@@ -134,6 +135,7 @@ export default function FormBuilder({ initialFormId = null }) {
                 setIsLoading(false);
             } catch (err) {
                 toast.error("Failed to load form");
+                setFetchError(true);
                 setIsLoading(false);
             }
         };
@@ -487,6 +489,26 @@ export default function FormBuilder({ initialFormId = null }) {
             <Loader2 className="animate-spin w-10 h-10 text-[#51b749]" />
         </div>
     );
+
+    if (fetchError) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-black p-4">
+                <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 max-w-md w-full text-center">
+                    <XCircle className="text-red-500 w-16 h-16 mx-auto mb-4" />
+                    <h1 className="text-2xl font-bold text-white mb-2">Form Not Found</h1>
+                    <p className="text-white/50 mb-6 text-sm">
+                        The form you're trying to edit does not exist or you do not have permission to view it.
+                    </p>
+                    <button
+                        onClick={() => navigate('/admin/dashboard')}
+                        className="w-full bg-[#13703a]/20 text-[#51b749] border border-[#51b749]/30 hover:bg-[#51b749]/20 transition-colors font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2"
+                    >
+                        <ArrowRight size={18} className="rotate-180" /> Back to Dashboard
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen font-sans bg-black pb-32 text-white selection:bg-[#51b749]/30 selection:text-[#51b749] relative overflow-x-hidden">

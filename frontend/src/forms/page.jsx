@@ -624,7 +624,7 @@ export default function PublicForm() {
                   <label className="flex items-start cursor-pointer w-full">
                     <input type="radio" checked={isSelected} onChange={() => update(targetVal)} className="mt-0.5 w-4 h-4 accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 object-cover rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 rounded border border-zinc-700 bg-[#050505]" />}
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
                     </div>
                   </label>
@@ -657,7 +657,7 @@ export default function PublicForm() {
                     <input type="checkbox" checked={isSelected} onChange={(e) => handleChange(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-[180px] object-cover rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-[180px] rounded border border-zinc-700 bg-[#050505]" />}
                     </div>
                   </label>
                   {opt.isOther && isSelected && (
@@ -767,12 +767,25 @@ export default function PublicForm() {
     );
   }
 
-  if (form?.settings?.acceptingResponses === false) {
+  if (!form) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
         <div className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-8 text-center max-w-md w-full shadow-lg">
           <AlertCircle className="text-red-500 w-12 h-12 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-white mb-2">Form Closed</h1>
+          <h1 className="text-xl font-bold text-white mb-2">Invalid Form Link</h1>
+          <p className="text-sm text-zinc-400 mb-6">The form you are looking for does not exist or has been deleted.</p>
+          <Button onClick={() => navigate('/p')} className="bg-zinc-800 hover:bg-zinc-700 text-white w-full font-semibold border border-zinc-700">Go to Home</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (form?.settings?.acceptingResponses === false) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
+        <div className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-8 text-center max-w-md w-full shadow-lg">
+          <AlertCircle className="text-yellow-500 w-12 h-12 mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-white mb-2">{form.title}</h1>
           <p className="text-sm text-zinc-400 mb-6">This form is no longer accepting responses.</p>
         </div>
       </div>
