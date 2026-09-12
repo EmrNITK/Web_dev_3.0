@@ -520,10 +520,6 @@ export const getPublicForm = async (req, res) => {
       return res.status(404).json({ message: "Form not found" });
     }
 
-    if (!form.settings.acceptingResponses) {
-      return res.status(403).json({ message: "This form is no longer accepting responses." });
-    }
-
     const formObj = form.toObject();
     delete formObj.userId;
 
