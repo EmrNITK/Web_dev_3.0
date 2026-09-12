@@ -1,70 +1,59 @@
 import React from 'react';
 import { marked } from 'marked';
 
-// --- PREPROCESSOR ---
+// Configure marked globally
+marked.setOptions({ breaks: true, gfm: true });
+
+// --- PREPROCESSOR: handles ![alt](url){width=50%} syntax ---
 const preprocessMarkdown = (md) => {
-  if (!md) return "";
-  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)\{([^}]+)\}/g, (match, alt, src, widthAttr) => {
+  if (!md) return '';
+  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)\{([^}]+)\}/g, (_, alt, src, widthAttr) => {
     let w = widthAttr.replace('width=', '').trim();
     if (!w.endsWith('%') && !w.endsWith('px') && !w.endsWith('vw')) w += '%';
-    return `<img src="${src}" alt="${alt}" style="width: ${w}; max-width: 100%;" />`;
+    return `<img src="${src}" alt="${alt}" style="width:${w};max-width:100%;" />`;
   });
 };
 
-export default function MarkdownRenderer({ content, className = "" }) {
+export default function MarkdownRenderer({ content, className = '' }) {
   if (!content) return null;
 
-  const processedContent = preprocessMarkdown(content);
-  
-  // Parse to HTML and force all links to open in a new blank tab
-  let rawHtml = marked.parse(processedContent, { breaks: true });
-  rawHtml = rawHtml.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
+  let html = marked.parse(preprocessMarkdown(content));
+  // Force all links open in new tab
+  html = html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
 
   return (
-    <div 
-      className={`
-        prose prose-invert max-w-none 
-        
-        /* --- Base Typography --- */
-        [&>p]:m-0 [&>p]:mb-1.5
-        [&_strong]:text-white [&_strong]:font-bold
-        
-        /* --- Images --- */
-        [&_img]:max-w-full [&_img]:rounded-md [&_img]:shadow-2xl [&_img]:border-zinc-800/50
-        
-        /* --- Links --- */
-        [&_a]:text-blue-400 hover:[&_a]:text-blue-300 [&_a]:underline [&_a]:underline-offset-4 hover:[&_a]:decoration-blue-400 [&_a]:transition-all
-        
-        /* --- Code & Preformatted Text --- */
-        [&_code]:bg-zinc-800/80 [&_code]:text-blue-300 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded-md [&_code]:font-mono [&_code]:text-sm [&_code]:border [&_code]:border-zinc-700
-        [&_pre]:bg-[#09090b] [&_pre]:border [&_pre]:border-zinc-800/80 [&_pre]:rounded-xl [&_pre]:p-5 [&_pre]:shadow-2xl
-        [&_pre>code]:bg-transparent [&_pre>code]:text-zinc-300 [&_pre>code]:p-0 [&_pre>code]:border-none [&_pre>code]:text-sm
-        
-        /* --- Blockquotes --- */
-        [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:bg-gradient-to-r [&_blockquote]:from-blue-500/10 [&_blockquote]:to-transparent [&_blockquote]:py-3 [&_blockquote]:pl-5 [&_blockquote]:pr-4 [&_blockquote]:rounded-r-xl [&_blockquote]:not-italic [&_blockquote]:text-zinc-400 [&_blockquote]:my-6
-        
-        /* --- Lists --- */
-        [&_ul]:list-none [&_ul]:pl-0 [&_ul]:space-y-1 [&_ul]:mb-2
-        [&_li]:relative [&_li]:pl-4
-        [&_ul>li::before]:content-[''] [&_ul>li::before]:absolute [&_ul>li::before]:w-1.5 [&_ul>li::before]:h-1.5 [&_ul>li::before]:bg-[#51b749] [&_ul>li::before]:rounded-full [&_ul>li::before]:left-1 [&_ul>li::before]:top-2.5
-        
-        [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-6 [&_ol>li]:pl-2 [&_ol>li::marker]:text-[#51b749] [&_ol>li::marker]:font-bold
-        
-        /* --- Headings --- */
-        [&_h1]:text-white [&_h1]:font-extrabold [&_h1]:tracking-tight [&_h1]:mb-6
-        [&_h2]:text-zinc-100 [&_h2]:font-bold [&_h2]:border-b [&_h2]:border-zinc-800/80 [&_h2]:pb-2 [&_h2]:mb-4 [&_h2]:mt-8
-        [&_h3]:text-zinc-200 [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-3
-        
-        /* --- Tables --- */
-        [&_table]:w-full [&_table]:border-collapse [&_table]:mb-6 [&_table]:overflow-hidden [&_table]:rounded-xl [&_table]:border [&_table]:border-zinc-800
-        [&_th]:bg-[#09090b] [&_th]:border-b [&_th]:border-zinc-800 [&_th]:p-4 [&_th]:text-left [&_th]:font-bold [&_th]:text-white
-        [&_td]:border-b [&_td]:border-zinc-800/50 [&_td]:p-4 [&_tr:hover]:bg-zinc-800/30 [&_tr]:transition-colors
-        
-        /* --- Horizontal Rules --- */
-        [&_hr]:border-t [&_hr]:border-zinc-800 [&_hr]:my-10
-        ${className}
-      `}
-      dangerouslySetInnerHTML={{ __html: rawHtml }}
-    />
+    <>
+      <style>{`
+        .md-body { color: #e4e4e7; font-size: 0.875rem; line-height: 1.7; }
+        .md-body p { margin: 0 0 0.75rem 0; }
+        .md-body p:last-child { margin-bottom: 0; }
+        .md-body strong { color: #ffffff; font-weight: 700; }
+        .md-body em { color: #d4d4d8; font-style: italic; }
+        .md-body a { color: #60a5fa; text-decoration: underline; text-underline-offset: 3px; word-break: break-all; }
+        .md-body a:hover { color: #93c5fd; }
+        .md-body img { max-width: 100%; border-radius: 8px; margin: 0.75rem 0; border: 1px solid #3f3f46; display: block; }
+        .md-body hr { border: none; border-top: 1px solid #52525b; margin: 1.25rem 0; }
+        .md-body h1 { color: #ffffff; font-size: 1.5rem; font-weight: 800; margin: 1rem 0 0.5rem; letter-spacing: -0.025em; }
+        .md-body h2 { color: #f4f4f5; font-size: 1.25rem; font-weight: 700; margin: 1rem 0 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid #27272a; }
+        .md-body h3 { color: #e4e4e7; font-size: 1rem; font-weight: 600; margin: 0.75rem 0 0.25rem; }
+        .md-body ul { list-style: disc; padding-left: 1.25rem; margin: 0.5rem 0; }
+        .md-body ol { list-style: decimal; padding-left: 1.25rem; margin: 0.5rem 0; }
+        .md-body li { color: #d4d4d8; margin: 0.15rem 0; }
+        .md-body ol li::marker { color: #60a5fa; font-weight: 600; }
+        .md-body code { background: #27272a; color: #93c5fd; padding: 0.1rem 0.4rem; border-radius: 4px; font-family: monospace; font-size: 0.8rem; border: 1px solid #3f3f46; }
+        .md-body pre { background: #09090b; border: 1px solid #27272a; border-radius: 8px; padding: 1rem; overflow-x: auto; margin: 0.75rem 0; }
+        .md-body pre code { background: transparent; border: none; padding: 0; color: #d4d4d8; font-size: 0.8rem; }
+        .md-body blockquote { border-left: 4px solid #3b82f6; background: rgba(59,130,246,0.07); padding: 0.5rem 0.75rem; margin: 0.75rem 0; border-radius: 0 6px 6px 0; color: #a1a1aa; font-style: normal; }
+        .md-body table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; font-size: 0.8rem; }
+        .md-body th { background: #09090b; border: 1px solid #3f3f46; padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; color: #ffffff; }
+        .md-body td { border: 1px solid #27272a; padding: 0.5rem 0.75rem; color: #d4d4d8; }
+        .md-body tr:hover td { background: rgba(255,255,255,0.02); }
+      `}</style>
+      <div
+        className={`md-body ${className}`}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </>
   );
 }
+

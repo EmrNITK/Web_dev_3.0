@@ -1,390 +1,290 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Image as ImageIcon, X, Check, Unlink } from 'lucide-react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import {
+  Bold, Italic, Link as LinkIcon, List, ListOrdered,
+  Image as ImageIcon, X, Check, Eye, Edit3, Minus
+} from 'lucide-react';
 import { marked } from 'marked';
-import TurndownService from 'turndown';
 import ImageUploader from './ImageUploader';
 
-// --- PREPROCESSOR ---
+// ---------------------------------------------------------------------------
+// Configure marked once
+// ---------------------------------------------------------------------------
+marked.setOptions({ breaks: true, gfm: true });
+
+// ---------------------------------------------------------------------------
+// Image-width preprocessor  ![alt](src){width=50%}  →  <img style="width:50%">
+// ---------------------------------------------------------------------------
 const preprocessMarkdown = (md) => {
-  if (!md) return "";
-  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)\{([^}]+)\}/g, (match, alt, src, widthAttr) => {
+  if (!md) return '';
+  return md.replace(/!\[([^\]]*)\]\(([^)]+)\)\{([^}]+)\}/g, (_, alt, src, widthAttr) => {
     let w = widthAttr.replace('width=', '').trim();
     if (!w.endsWith('%') && !w.endsWith('px') && !w.endsWith('vw')) w += '%';
-    return `<img src="${src}" alt="${alt}" style="width: ${w}; max-width: 100%;" />`;
+    return `<img src="${src}" alt="${alt}" style="width:${w};max-width:100%;" />`;
   });
 };
 
-// --- TURNDOWN CONFIGURATION ---
-const turndownService = new TurndownService({
-  headingStyle: 'atx',
-  codeBlockStyle: 'fenced',
-  bulletListMarker: '-',
-});
+// ---------------------------------------------------------------------------
+// Render markdown → safe HTML string
+// ---------------------------------------------------------------------------
+const renderMarkdown = (md) => {
+  if (!md) return '';
+  let html = marked.parse(preprocessMarkdown(md));
+  html = html.replace(/<a /g, '<a target="_blank" rel="noopener noreferrer" ');
+  return html;
+};
 
-// Preserve blank lines: an empty <p> or <div> (or one with only <br>) becomes \n\n
-turndownService.addRule('blankLine', {
-  filter: (node) => {
-    if (node.nodeName !== 'P' && node.nodeName !== 'DIV') return false;
-    const text = node.textContent.trim();
-    // Check if it only contains whitespace / br
-    const hasOnlyBr = node.children.length === 1 && node.children[0].nodeName === 'BR';
-    return text === '' || hasOnlyBr;
-  },
-  replacement: () => '\n\n',
-});
+// ---------------------------------------------------------------------------
+// Insert text at textarea cursor position, preserving undo history
+// ---------------------------------------------------------------------------
+const insertAtCursor = (textarea, before, after = '', placeholder = '') => {
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const selected = textarea.value.substring(start, end) || placeholder;
+  const replacement = before + selected + after;
+  textarea.focus();
+  document.execCommand('insertText', false, replacement);
+  const newCursor = start + before.length + selected.length;
+  textarea.setSelectionRange(newCursor, newCursor);
+};
 
-// Convert standalone <br> tags into a newline
-turndownService.addRule('lineBreak', {
-  filter: 'br',
-  replacement: () => '  \n',
-});
+// Insert a block (hr, heading) on its own line
+const insertBlock = (textarea, snippet) => {
+  const start = textarea.selectionStart;
+  const val = textarea.value;
+  const needsBefore = start > 0 && val[start - 1] !== '\n' ? '\n' : '';
+  textarea.focus();
+  document.execCommand('insertText', false, needsBefore + snippet + '\n');
+};
 
-turndownService.addRule('resizableImage', {
-  filter: 'img',
-  replacement: function (content, node) {
-    const src = node.getAttribute('src') || '';
-    const alt = node.getAttribute('alt') || '';
-    const width = node.style.width || node.getAttribute('width');
-    
-    if (width) {
-      return `![${alt}](${src}){width=${width}}`;
-    }
-    return `![${alt}](${src})`;
-  }
-});
+// ---------------------------------------------------------------------------
+// ToolbarBtn helper
+// ---------------------------------------------------------------------------
+const ToolbarBtn = ({ onClick, icon: Icon, title, active }) => (
+  <button
+    type="button"
+    onMouseDown={e => { e.preventDefault(); onClick(); }}
+    title={title}
+    className={`p-1.5 rounded transition-colors ${active ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'}`}
+  >
+    {Icon && <Icon className="w-4 h-4" />}
+  </button>
+);
 
-const RichMarkdownEditor = ({ initialValue = "", onChange }) => {
-  const containerRef = useRef(null);
-  const editorRef = useRef(null);
-  const linkInputRef = useRef(null);
-  
-  const [isEditing, setIsEditing] = useState(false);
+const Sep = () => <div className="w-px h-4 bg-zinc-700 mx-1 shrink-0" />;
+
+const ModeBtn = ({ label, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`px-2.5 py-1 text-xs font-medium transition-colors ${active ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+  >
+    {label}
+  </button>
+);
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+const RichMarkdownEditor = ({ initialValue = '', onChange }) => {
+  const textareaRef = useRef(null);
+  const linkUrlRef = useRef(null);
+  const [value, setValue] = useState(initialValue);
+  const [mode, setMode] = useState('write'); // 'write' | 'preview' | 'split'
   const [showUploader, setShowUploader] = useState(false);
-  const [savedRange, setSavedRange] = useState(null);
-  const [selectedImg, setSelectedImg] = useState(null);
-  const [imgRect, setImgRect] = useState(null);
-  const [linkState, setLinkState] = useState({ isOpen: false, url: '', targetNode: null });
-  const [activeFormats, setActiveFormats] = useState({ 
-    bold: false, italic: false, insertUnorderedList: false, insertOrderedList: false, link: false 
-  });
+  const [linkState, setLinkState] = useState({ isOpen: false, url: '', text: '' });
 
+  // Sync if parent pushes a new initialValue after mount (e.g. API load)
   useEffect(() => {
-    if (editorRef.current && initialValue && !editorRef.current.innerHTML) {
-      editorRef.current.innerHTML = marked.parse(preprocessMarkdown(initialValue), { breaks: true });
+    if (initialValue && !value) {
+      setValue(initialValue);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValue]);
 
-  const syncImgRect = useCallback(() => {
-    if (selectedImg && editorRef.current) {
-      const edRect = editorRef.current.getBoundingClientRect();
-      const imgR = selectedImg.getBoundingClientRect();
-      setImgRect({
-        top: imgR.top - edRect.top + editorRef.current.scrollTop,
-        left: imgR.left - edRect.left + editorRef.current.scrollLeft,
-        width: imgR.width,
-        height: imgR.height
-      });
-    } else {
-      setImgRect(null);
-    }
-  }, [selectedImg]);
+  const handleChange = useCallback((e) => {
+    const newVal = e.target.value;
+    setValue(newVal);
+    onChange?.(newVal);
+  }, [onChange]);
 
-  useEffect(() => {
-    syncImgRect();
-    window.addEventListener('resize', syncImgRect);
-    return () => window.removeEventListener('resize', syncImgRect);
-  }, [syncImgRect]);
+  // ── Toolbar helpers ──────────────────────────────────────────────────────
 
-  const handleInput = useCallback(() => {
-    if (editorRef.current && onChange) {
-      syncImgRect(); 
-      const html = editorRef.current.innerHTML;
-      const markdown = turndownService.turndown(html);
-      onChange(markdown);
-    }
-  }, [onChange, syncImgRect]);
+  const wrap = useCallback((before, after = '', placeholder = '') => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    insertAtCursor(ta, before, after, placeholder);
+    const newVal = ta.value;
+    setValue(newVal);
+    onChange?.(newVal);
+  }, [onChange]);
 
-  const handleContainerFocus = () => setIsEditing(true);
-  
-  const handleContainerBlur = (e) => {
-    if (showUploader) return;
-    if (containerRef.current && !containerRef.current.contains(e.relatedTarget)) {
-      setIsEditing(false);
-      setSelectedImg(null);
-      setShowUploader(false);
-      setLinkState({ isOpen: false, url: '', targetNode: null });
-    }
-  };
+  const block = useCallback((snippet) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    insertBlock(ta, snippet);
+    const newVal = ta.value;
+    setValue(newVal);
+    onChange?.(newVal);
+  }, [onChange]);
 
-  const updateActiveStates = useCallback((e) => {
-    if (e && e.target && e.target.tagName === 'IMG') {
-      setSelectedImg(e.target);
-    } else if (e && e.type === 'mouseup') {
-      setSelectedImg(null); 
-    }
-
-    const formats = ['bold', 'italic', 'insertUnorderedList', 'insertOrderedList'];
-    const newStates = {};
-    formats.forEach(cmd => newStates[cmd] = document.queryCommandState(cmd));
-
-    const selection = window.getSelection();
-    let isLink = false;
-    if (selection.rangeCount > 0) {
-      let node = selection.focusNode;
-      while (node && node !== editorRef.current) {
-        if (node.nodeName === 'A') isLink = true;
-        node = node.parentNode;
-      }
-    }
-    newStates.link = isLink;
-    setActiveFormats(newStates);
-  }, []);
-
-  const handleKeyDown = (e) => {
-    if (selectedImg && (e.key === 'Backspace' || e.key === 'Delete')) {
-      e.preventDefault();
-      selectedImg.remove();
-      setSelectedImg(null);
-      setImgRect(null);
-      handleInput(); 
-    }
-  };
-
-  const executeCommand = (command, value = null) => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-      document.execCommand(command, false, value);
-      updateActiveStates();
-      handleInput();
-    }
-  };
-
-  const executeFormatCommand = (command) => executeCommand(command);
-
-  const openLinkEditor = (e) => {
-    e.preventDefault();
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) setSavedRange(selection.getRangeAt(0));
-
-    let node = selection.focusNode;
-    let existingLinkNode = null;
-    while (node && node !== editorRef.current) {
-      if (node.nodeName === 'A') { existingLinkNode = node; break; }
-      node = node.parentNode;
-    }
-
-    setLinkState({
-      isOpen: true,
-      url: existingLinkNode ? existingLinkNode.getAttribute('href') : '',
-      targetNode: existingLinkNode
-    });
-    setTimeout(() => linkInputRef.current?.focus(), 0);
-  };
-
-  const saveLink = () => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-      if (savedRange && !linkState.targetNode) {
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(savedRange);
-      }
-      if (linkState.url) {
-        if (linkState.targetNode) {
-          linkState.targetNode.setAttribute('href', linkState.url);
-        } else {
-          executeCommand('createLink', linkState.url);
-        }
-        handleInput();
-      }
-    }
-    setLinkState({ isOpen: false, url: '', targetNode: null });
-    setSavedRange(null);
-  };
-
-  const removeLink = () => {
-    if (linkState.targetNode) {
-      const text = document.createTextNode(linkState.targetNode.textContent);
-      linkState.targetNode.parentNode.replaceChild(text, linkState.targetNode);
-      handleInput();
-    }
-    setLinkState({ isOpen: false, url: '', targetNode: null });
-  };
-
-  const handleImageUploaded = (url) => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-      if (savedRange) {
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(savedRange);
-      }
-      executeCommand('insertHTML', `&nbsp;<img src="${url}" alt="Image" style="width: 50%; max-width: 100%;" />&nbsp;`);
-    }
+  const handleImageUploaded = useCallback((url) => {
+    wrap(`![Image](${url}){width=50%}`);
     setShowUploader(false);
-    setSavedRange(null);
-  };
+  }, [wrap]);
 
-  const startImageResize = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!selectedImg || !editorRef.current) return;
+  const saveLink = useCallback(() => {
+    const { url, text } = linkState;
+    if (url) {
+      wrap(`[${text || 'link'}](${url})`);
+    }
+    setLinkState({ isOpen: false, url: '', text: '' });
+  }, [linkState, wrap]);
 
-    const startX = e.clientX;
-    const startWidthPx = selectedImg.getBoundingClientRect().width;
-    const containerWidth = editorRef.current.getBoundingClientRect().width;
+  // Tab key → 2-space indent
+  const handleKeyDown = useCallback((e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      wrap('  ');
+    }
+  }, [wrap]);
 
-    const onMouseMove = (moveEvent) => {
-      const newWidthPx = Math.max(50, startWidthPx + (moveEvent.clientX - startX)); 
-      const newWidthPct = Math.min(100, (newWidthPx / containerWidth) * 100);
-      
-      selectedImg.style.width = `${newWidthPct.toFixed(2)}%`;
-      selectedImg.removeAttribute('width'); 
-      syncImgRect(); 
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-      handleInput(); 
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  const ToolbarButton = ({ onClick, active, icon: Icon, title }) => (
-    <button
-      onMouseDown={onClick}
-      className={`p-2 rounded transition-colors ${
-        active ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
-      }`}
-      title={title}
-    >
-      <Icon className="w-4 h-4" />
-    </button>
-  );
+  const previewHtml = renderMarkdown(value);
+  const showWrite = mode === 'write' || mode === 'split';
+  const showPreview = mode === 'preview' || mode === 'split';
 
   return (
-    <div 
-      ref={containerRef}
-      onFocus={handleContainerFocus}
-      onBlur={handleContainerBlur}
-      tabIndex={-1} 
-      className={`flex flex-col w-full max-w-3xl bg-zinc-950/40 rounded-xl overflow-hidden transition-all duration-300 outline-none
-        ${isEditing ? 'border border-zinc-700 shadow-xl' : 'border border-transparent'}
-      `}
-    >
-      {isEditing && (
-        <div className="flex items-center gap-1 p-2 bg-zinc-900 border-b border-zinc-800 flex-wrap relative">
-          <ToolbarButton onClick={(e) => { e.preventDefault(); executeFormatCommand('bold'); }} active={activeFormats.bold} icon={Bold} title="Bold" />
-          <ToolbarButton onClick={(e) => { e.preventDefault(); executeFormatCommand('italic'); }} active={activeFormats.italic} icon={Italic} title="Italic" />
-          <ToolbarButton onClick={openLinkEditor} active={activeFormats.link || linkState.isOpen} icon={LinkIcon} title="Link" />
-          <div className="w-px h-5 bg-zinc-700 mx-2"></div>
-          <ToolbarButton onClick={(e) => { e.preventDefault(); executeCommand('insertUnorderedList'); }} active={activeFormats.insertUnorderedList} icon={List} title="Bullet List" />
-          <ToolbarButton onClick={(e) => { e.preventDefault(); executeCommand('insertOrderedList'); }} active={activeFormats.insertOrderedList} icon={ListOrdered} title="Numbered List" />
-          <div className="w-px h-5 bg-zinc-700 mx-2"></div>
-          <button
-            onMouseDown={(e) => {
-              e.preventDefault();
-              const selection = window.getSelection();
-              if (selection.rangeCount > 0) setSavedRange(selection.getRangeAt(0));
-              setShowUploader(!showUploader);
-            }}
-            className={`p-2 rounded transition-colors flex items-center gap-2 text-sm font-medium ml-auto ${
-              showUploader ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800'
-            }`}
-          >
-            <ImageIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Image</span>
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col w-full rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950/60">
 
-      {/* RESTORED LINK EDITOR UI */}
-      {isEditing && linkState.isOpen && (
-        <div className="px-4 py-3 bg-zinc-800 border-b border-zinc-700 flex items-center gap-2">
+      {/* ── Toolbar ── */}
+      <div className="flex items-center gap-0.5 px-2 py-1.5 bg-zinc-900 border-b border-zinc-800 flex-wrap">
+        <ToolbarBtn title="Bold" onClick={() => wrap('**', '**', 'bold text')} icon={Bold} />
+        <ToolbarBtn title="Italic" onClick={() => wrap('*', '*', 'italic text')} icon={Italic} />
+        <Sep />
+        <ToolbarBtn title="Bullet list" onClick={() => block('- List item')} icon={List} />
+        <ToolbarBtn title="Numbered list" onClick={() => block('1. List item')} icon={ListOrdered} />
+        <Sep />
+        <ToolbarBtn
+          title="Insert link"
+          onClick={() => { setLinkState({ isOpen: true, url: '', text: '' }); setTimeout(() => linkUrlRef.current?.focus(), 0); }}
+          icon={LinkIcon}
+          active={linkState.isOpen}
+        />
+        <ToolbarBtn
+          title="Insert image"
+          onClick={() => setShowUploader(v => !v)}
+          icon={ImageIcon}
+          active={showUploader}
+        />
+        <ToolbarBtn title="Horizontal rule (---)" onClick={() => block('---')} icon={Minus} />
+        <Sep />
+        {/* Mode switcher */}
+        <div className="flex items-center ml-auto bg-zinc-800 rounded-lg overflow-hidden divide-x divide-zinc-700">
+          <ModeBtn label="Write" active={mode === 'write'} onClick={() => setMode('write')} />
+          <ModeBtn label="Preview" active={mode === 'preview'} onClick={() => setMode('preview')} />
+          <ModeBtn label="Split" active={mode === 'split'} onClick={() => setMode('split')} />
+        </div>
+      </div>
+
+      {/* ── Link input row ── */}
+      {linkState.isOpen && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-zinc-800 border-b border-zinc-700">
           <input
-            ref={linkInputRef}
-            type="url"
-            value={linkState.url}
-            onChange={(e) => setLinkState({ ...linkState, url: e.target.value })}
-            placeholder="https://example.com"
-            className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-100 px-3 py-1.5 rounded text-sm focus:outline-none focus:border-blue-500"
-            onKeyDown={(e) => e.key === 'Enter' && saveLink()}
+            type="text"
+            placeholder="Link text (optional)"
+            value={linkState.text}
+            onChange={e => setLinkState(s => ({ ...s, text: e.target.value }))}
+            className="w-32 bg-zinc-900 border border-zinc-700 text-zinc-100 px-2 py-1 rounded text-sm focus:outline-none focus:border-blue-500"
           />
-          <button onMouseDown={(e) => { e.preventDefault(); saveLink(); }} className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded">
+          <input
+            ref={linkUrlRef}
+            type="url"
+            placeholder="https://example.com"
+            value={linkState.url}
+            onChange={e => setLinkState(s => ({ ...s, url: e.target.value }))}
+            onKeyDown={e => e.key === 'Enter' && saveLink()}
+            className="flex-1 bg-zinc-900 border border-zinc-700 text-zinc-100 px-2 py-1 rounded text-sm focus:outline-none focus:border-blue-500"
+          />
+          <button onClick={saveLink} className="p-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded" title="Insert">
             <Check className="w-4 h-4" />
           </button>
-          {linkState.targetNode && (
-            <button onMouseDown={(e) => { e.preventDefault(); removeLink(); }} className="p-1.5 bg-red-500/10 text-red-400 rounded">
-              <Unlink className="w-4 h-4" />
-            </button>
-          )}
-          <button onMouseDown={(e) => { e.preventDefault(); setLinkState({ isOpen: false, url: '', targetNode: null }); }} className="p-1.5 text-zinc-400 hover:text-zinc-200">
+          <button onClick={() => setLinkState({ isOpen: false, url: '', text: '' })} className="p-1.5 text-zinc-400 hover:text-zinc-200 rounded">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* RESTORED IMAGE UPLOADER UI */}
-      {isEditing && showUploader && (
+      {/* ── Image uploader row ── */}
+      {showUploader && (
         <div className="p-4 bg-zinc-900 border-b border-zinc-800 relative">
-          <button onMouseDown={() => setShowUploader(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-zinc-300 z-10"><X className="w-5 h-5" /></button>
+          <button onClick={() => setShowUploader(false)} className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-300">
+            <X className="w-4 h-4" />
+          </button>
           <ImageUploader onUpload={handleImageUploaded} width={800} />
         </div>
       )}
 
-      <div className="relative w-full">
-        <div
-          ref={editorRef}
-          contentEditable
-          onInput={handleInput}
-          onKeyUp={updateActiveStates}
-          onMouseUp={updateActiveStates}
-          onKeyDown={handleKeyDown} 
-          className={`w-full min-h-[4rem] p-4 bg-transparent text-zinc-100 focus:outline-none leading-relaxed
-            ${!isEditing ? 'hover:bg-zinc-900/50 rounded-xl transition-colors cursor-text' : ''}
-            [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-2
-            [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-2
-            [&_a]:text-blue-400 [&_a]:underline
-            [&_img]:inline-block [&_img]:align-bottom [&_img]:mx-1 [&_img]:rounded-md [&_img]:cursor-pointer
-          `}
-        />
+      {/* ── Editor / Preview panes ── */}
+      <div className={`flex ${mode === 'split' ? 'divide-x divide-zinc-800' : ''}`}>
 
-        {isEditing && selectedImg && imgRect && (
-          <div
-            style={{
-              position: 'absolute',
-              top: imgRect.top,
-              left: imgRect.left,
-              width: imgRect.width,
-              height: imgRect.height,
-              border: '2px solid #3b82f6',
-              pointerEvents: 'none',
-              zIndex: 10
-            }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                bottom: -6,
-                right: -6,
-                width: 14,
-                height: 14,
-                backgroundColor: '#3b82f6',
-                border: '2px solid white',
-                borderRadius: '50%',
-                cursor: 'nwse-resize',
-                pointerEvents: 'auto'
-              }}
-              onMouseDown={startImageResize}
-            />
-          </div>
+        {showWrite && (
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            placeholder={"Write markdown here…\n\n• Press Enter twice for a new paragraph\n• Use --- on its own line for a horizontal rule\n• **bold**  *italic*  [link](url)"}
+            spellCheck
+            className={`
+              bg-transparent text-zinc-100 text-sm leading-relaxed
+              p-4 resize-none focus:outline-none font-mono placeholder:text-zinc-600
+              ${mode === 'split' ? 'w-1/2' : 'w-full'}
+            `}
+            style={{ minHeight: '8rem' }}
+          />
         )}
+
+        {showPreview && (
+          <div
+            className={`
+              p-4 text-sm leading-relaxed overflow-auto
+              ${mode === 'split' ? 'w-1/2' : 'w-full'}
+              [&>p]:mt-0 [&>p]:mb-3
+              [&_strong]:text-white [&_strong]:font-bold
+              [&_em]:text-zinc-300 [&_em]:italic
+              [&_a]:text-blue-400 [&_a]:underline [&_a]:underline-offset-4 [&_a]:break-all hover:[&_a]:text-blue-300
+              [&_img]:max-w-full [&_img]:rounded-lg [&_img]:my-3 [&_img]:border [&_img]:border-zinc-700
+              [&_code]:bg-zinc-800 [&_code]:text-blue-300 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-xs [&_code]:border [&_code]:border-zinc-700
+              [&_pre]:bg-zinc-900 [&_pre]:border [&_pre]:border-zinc-800 [&_pre]:rounded-lg [&_pre]:p-4 [&_pre]:overflow-x-auto [&_pre]:my-3
+              [&_pre>code]:bg-transparent [&_pre>code]:border-none [&_pre>code]:p-0 [&_pre>code]:text-zinc-300
+              [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:text-zinc-400 [&_blockquote]:my-3 [&_blockquote]:not-italic
+              [&_ul]:list-disc [&_ul]:ml-5 [&_ul]:my-2 [&_ul>li]:my-0.5 [&_ul>li]:text-zinc-200
+              [&_ol]:list-decimal [&_ol]:ml-5 [&_ol]:my-2 [&_ol>li]:my-0.5 [&_ol>li]:text-zinc-200
+              [&_ol>li::marker]:text-blue-400 [&_ol>li::marker]:font-semibold
+              [&_h1]:text-white [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mt-4 [&_h1]:mb-2
+              [&_h2]:text-zinc-100 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2 [&_h2]:border-b [&_h2]:border-zinc-800 [&_h2]:pb-1
+              [&_h3]:text-zinc-200 [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
+              [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-zinc-600 [&_hr]:my-5
+              [&_table]:w-full [&_table]:border-collapse [&_table]:my-3 [&_table]:text-sm
+              [&_th]:bg-zinc-900 [&_th]:border [&_th]:border-zinc-700 [&_th]:p-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-white
+              [&_td]:border [&_td]:border-zinc-800 [&_td]:p-2 [&_td]:text-zinc-300
+            `}
+            dangerouslySetInnerHTML={{ __html: previewHtml || '<p style="color:#52525b;font-style:italic">Nothing to preview yet…</p>' }}
+          />
+        )}
+      </div>
+
+      {/* ── Hint bar ── */}
+      <div className="px-3 py-1 bg-zinc-900/50 border-t border-zinc-800/50 text-[10px] text-zinc-600 flex flex-wrap gap-x-4 gap-y-0.5 select-none">
+        <span><code className="text-zinc-500">**bold**</code></span>
+        <span><code className="text-zinc-500">*italic*</code></span>
+        <span><code className="text-zinc-500">[text](url)</code></span>
+        <span><code className="text-zinc-500">![alt](url)</code></span>
+        <span><code className="text-zinc-500">---</code> = horizontal line</span>
+        <span>2× Enter = new paragraph</span>
       </div>
     </div>
   );
 };
 
 export default RichMarkdownEditor;
+
