@@ -624,7 +624,7 @@ export default function PublicForm() {
                   <label className="flex items-start cursor-pointer w-full">
                     <input type="radio" checked={isSelected} onChange={() => update(targetVal)} className="mt-0.5 w-4 h-4 accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-32 max-w-[200px] object-cover rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 object-cover rounded border border-zinc-700 bg-[#050505]" />}
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
                     </div>
                   </label>
@@ -1096,11 +1096,16 @@ export default function PublicForm() {
               <div key={el.id} className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-5 shadow-sm">
                 {!['IMAGE', 'TEXT_ONLY'].includes(el.type) && (
                   <div className="flex justify-between items-start mb-3 gap-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 leading-snug">
-                        {el.question} {el.required && <span className="text-red-500">*</span>}
-                      </h3>
-                      {el.description && <p className="text-xs text-zinc-500 mt-1">{el.description}</p>}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-zinc-200 leading-snug">
+                        <MarkdownRenderer content={el.question} />
+                        {el.required && <span className="text-red-500 ml-0.5">*</span>}
+                      </div>
+                      {el.description && (
+                        <div className="text-xs text-zinc-500 mt-1">
+                          <MarkdownRenderer content={el.description} />
+                        </div>
+                      )}
                     </div>
                     {el.points > 0 && form.settings.isQuiz && <span className="text-[10px] font-bold bg-zinc-900 px-1.5 py-0.5 rounded text-zinc-400 border border-zinc-800 shrink-0">{el.points} PTS</span>}
                   </div>
