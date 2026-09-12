@@ -1097,9 +1097,11 @@ export default function PublicForm() {
                 {!['IMAGE', 'TEXT_ONLY'].includes(el.type) && (
                   <div className="flex justify-between items-start mb-3 gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-semibold text-zinc-200 leading-snug">
-                        <MarkdownRenderer content={el.question} />
-                        {el.required && <span className="text-red-500 ml-0.5">*</span>}
+                      <div className="flex items-start gap-0.5">
+                        <div className="text-sm font-semibold text-zinc-200 leading-snug flex-1">
+                          <MarkdownRenderer content={el.question} />
+                        </div>
+                        {el.required && <span className="text-red-500 shrink-0 mt-0.5 text-sm leading-none">*</span>}
                       </div>
                       {el.description && (
                         <div className="text-xs text-zinc-500 mt-1">
