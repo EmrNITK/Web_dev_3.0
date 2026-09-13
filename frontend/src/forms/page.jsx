@@ -624,7 +624,7 @@ export default function PublicForm() {
                   <label className="flex items-start cursor-pointer w-full">
                     <input type="radio" checked={isSelected} onChange={() => update(targetVal)} className="mt-0.5 w-4 h-4 accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 w-auto rounded border border-zinc-700 bg-[#050505]" />}
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
                     </div>
                   </label>
@@ -657,7 +657,7 @@ export default function PublicForm() {
                     <input type="checkbox" checked={isSelected} onChange={(e) => handleChange(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-[180px] rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 w-auto rounded border border-zinc-700 bg-[#050505]" />}
                     </div>
                   </label>
                   {opt.isOther && isSelected && (
@@ -820,7 +820,8 @@ export default function PublicForm() {
             <ShieldCheck className="text-green-500 w-12 h-12 mx-auto mb-4" />
             <h1 className="text-xl font-bold text-white mb-2">Submission Successful</h1>
             <p className="text-sm text-zinc-400 mb-6 whitespace-pre-wrap">
-              {submissionResult?.message || "Your response has been recorded."}
+              {/* {submissionResult?.message || "Your response has been recorded."} */}
+              <MarkdownRenderer content={submissionResult?.message || "Your response has been recorded."} />
             </p>
 
             {submissionResult?.score && (
@@ -860,7 +861,7 @@ export default function PublicForm() {
                 </div>
               </div>
             ) : (
-              <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-[#0078d4] rounded-md p-5 sm:p-6 shadow-sm space-y-6">
+              <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-[#0078d4] rounded-md p-4 sm:p-4 shadow-sm space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
                   <div>
@@ -875,7 +876,7 @@ export default function PublicForm() {
                 </div>
 
                 {/* Amount Display */}
-                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-md p-4 text-center">
+                <div className="bg-[#0a0a0a] border border-zinc-800 rounded-md p-3 text-center">
                   <span className="text-[11px] text-zinc-400 uppercase font-medium tracking-wider">
                     Amount to Pay
                   </span>
@@ -883,7 +884,7 @@ export default function PublicForm() {
                     ₹{paymentSession.exactAmount.toFixed(2)}
                   </div>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Base: ₹{paymentSession.baseAmount}.00 (Includes verification code)
+                    (Includes verification code)
                   </p>
                 </div>
 
