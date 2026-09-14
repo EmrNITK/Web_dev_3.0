@@ -144,7 +144,7 @@ router.post('/verify-otp', async (req, res) => {
     await user.save();
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.cookie('token', token, { httpOnly: true, maxAge: 86400000, sameSite: 'lax' });
+    res.cookie('token', token, { httpOnly: true, maxAge: 86400000, sameSite: 'none', secure: true });
     res.status(200).json({ user });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -163,7 +163,7 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-    res.cookie('token', token, { httpOnly: true, maxAge: 86400000, sameSite: 'lax' });
+    res.cookie('token', token, { httpOnly: true, maxAge: 86400000, sameSite: 'none', secure: true });
     res.status(200).json({ user });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -186,7 +186,7 @@ router.get('/me', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('token');
+  res.clearCookie('token', { httpOnly: true, sameSite: 'none', secure: true });
   res.status(200).json({ message: 'Logged out successfully' });
 });
 

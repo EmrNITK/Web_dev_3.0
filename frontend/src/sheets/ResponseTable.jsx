@@ -58,7 +58,7 @@ export default function ResponseTable() {
   const [accessDenied, setAccessDenied] = useState(false);
   const [requestState, setRequestState] = useState('idle');
   const [requestMessage, setRequestMessage] = useState('');
-  const [selection, setSelection] = useState({ start: null, end: null, isDragging: false });
+  const [selection, setSelection] = useState({ start: null, end: null, isDragging: false, fillMode: false });
   const [activeRowId, setActiveRowId] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [showColumnPanel, setShowColumnPanel] = useState(false);
@@ -82,7 +82,12 @@ export default function ResponseTable() {
   }, [form, user]);
 
   useEffect(() => {
-    const onMouseUp = () => setSelection(s => ({ ...s, isDragging: false }));
+    const onMouseUp = () => setSelection(s => {
+      if (s.fillMode) {
+        setTimeout(() => handleBatchFill(s), 0);
+      }
+      return { ...s, isDragging: false, fillMode: false };
+    });
     const handleClickOutside = (e) => {
       if (!e.target.closest('.context-menu-container')) {
         setContextMenu(null);
@@ -377,6 +382,24 @@ export default function ResponseTable() {
       });
     } catch (err) {
       toast.error('Failed to delete row');
+      fetchResponses(true, true);
+    }
+  };
+
+  const handleMultiDelete = async (responseIds) => {
+    if (!hasAccess) return;
+    if (!window.confirm(`Are you sure you want to delete ${responseIds.length} rows?`)) return;
+    try {
+      const token = localStorage.getItem('token');
+      setResponses(prev => prev.filter(r => !responseIds.includes(r._id)));
+      setActiveRowId(null);
+      setSelection({ start: null, end: null, isDragging: false });
+      setContextMenu(null);
+      await axios.post(`${API_URL}/api/responses/delete-batch`, { responseIds }, {
+        headers: { Authorization: token }, withCredentials: true
+      });
+    } catch (err) {
+      toast.error('Failed to delete rows');
       fetchResponses(true, true);
     }
   };
@@ -677,6 +700,79 @@ export default function ResponseTable() {
       hasNumbers
     };
   }, [selection, rows, columns]);
+
+  const handleBatchFill = async (currentSelection) => {
+    if (!hasAccess) return;
+    if (!currentSelection.start || !currentSelection.end) return;
+
+    const rStart = Math.min(currentSelection.start.r, currentSelection.end.r);
+    const rEnd = Math.max(currentSelection.start.r, currentSelection.end.r);
+    const cStart = Math.min(currentSelection.start.c, currentSelection.end.c);
+    const cEnd = Math.max(currentSelection.start.c, currentSelection.end.c);
+
+    if (rStart === rEnd && cStart === cEnd) return;
+
+    const sourceRow = rows[currentSelection.start.r];
+    if (!sourceRow) return;
+
+    const updates = [];
+    const newResponses = [...responses];
+
+    for (let r = rStart; r <= rEnd; r++) {
+      if (r === currentSelection.start.r) continue; // Skip source row
+      const targetRow = rows[r];
+      if (!targetRow) continue;
+
+      const responseId = targetRow.original._id;
+      const responseIndex = newResponses.findIndex(res => res._id === responseId);
+      if (responseIndex === -1) continue;
+
+      const updatedResponse = { ...newResponses[responseIndex] };
+      let updatedAnswers = [...(updatedResponse.answers || [])];
+
+      for (let c = cStart; c <= cEnd; c++) {
+        const column = columns[c];
+        if (!column || column.id === 'rowNumber') continue;
+
+        const val = sourceRow.values[column.id];
+        
+        if (column.id === 'remark' || column.id === 'color') {
+          updatedResponse[column.id] = val;
+          updates.push({ responseId, isCoreField: true, field: column.id, value: val });
+        } else if (column.id.startsWith('answers.')) {
+          const qId = column.id.substring(8);
+          const idx = updatedAnswers.findIndex(a => String(a.questionId) === String(qId));
+          if (idx >= 0) updatedAnswers[idx] = { ...updatedAnswers[idx], value: val };
+          else updatedAnswers.push({ questionId: qId, value: val });
+          
+          updates.push({ responseId, isCoreField: false, questionId: qId, value: val });
+        }
+      }
+      updatedResponse.answers = updatedAnswers;
+      newResponses[responseIndex] = updatedResponse;
+    }
+
+    setResponses(newResponses);
+
+    try {
+      const token = localStorage.getItem('token');
+      await Promise.all(updates.map(update => {
+        if (update.isCoreField) {
+          return axios.put(`${API_URL}/api/responses/${update.responseId}/core`, { fieldName: update.field, value: update.value }, {
+            headers: { Authorization: token }, withCredentials: true
+          });
+        } else {
+          return axios.put(`${API_URL}/api/responses/${update.responseId}/answer`, { questionId: update.questionId, value: update.value }, {
+            headers: { Authorization: token }, withCredentials: true
+          });
+        }
+      }));
+      toast.success('Batch fill successful');
+    } catch (err) {
+      toast.error('Batch fill partially failed');
+      fetchResponses(true, true);
+    }
+  };
 
   const handleResizeStart = (columnId, startX, startWidth, e) => {
     e.preventDefault();
@@ -1149,7 +1245,14 @@ export default function ResponseTable() {
                             `} />
                         )}
                         {!isEditingCell && isBottomEdge && isRightEdge && hasAccess && (
-                          <div className="absolute -bottom-[4px] -right-[4px] w-[8px] h-[8px] bg-[#1a73e8] border border-white cursor-crosshair z-20 pointer-events-none shadow-sm" />
+                          <div 
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setSelection(prev => ({ ...prev, isDragging: true, fillMode: true }));
+                            }}
+                            className="absolute -bottom-[4px] -right-[4px] w-[8px] h-[8px] bg-[#1a73e8] border border-white cursor-crosshair z-20 shadow-sm" 
+                          />
                         )}
                         {cell.render('Cell')}
                       </td>
@@ -1227,25 +1330,77 @@ export default function ResponseTable() {
               >
                 <EyeOff size={16} className="text-[#5f6368]" /> Hide Column
               </div>
+              
+              {contextMenu.columnId === 'paymentStatus' && (
+                <>
+                  <div className="w-full h-px bg-[#dadce0] my-1" />
+                  <div className="px-4 py-1.5 text-[11px] font-bold text-[#9aa0a6] uppercase tracking-wider">Filter</div>
+                  {['SUCCESS', 'PENDING', 'PENDING_VERIFICATION'].map(status => (
+                    <div
+                      key={status}
+                      className="px-4 py-2 hover:bg-[#f1f3f4] cursor-pointer text-[#202124] text-[13px] flex items-center gap-3 transition-colors"
+                      onClick={() => {
+                        setFilters(prev => ({ ...prev, paymentStatus: status }));
+                        setContextMenu(null);
+                      }}
+                    >
+                      {filters.paymentStatus === status ? <span className="text-[#1a73e8] font-bold">✓</span> : <span className="w-2" />} {status}
+                    </div>
+                  ))}
+                  <div
+                    className="px-4 py-2 hover:bg-[#f1f3f4] cursor-pointer text-[#d93025] text-[13px] flex items-center gap-3 transition-colors"
+                    onClick={() => {
+                      setFilters(prev => {
+                        const newF = { ...prev };
+                        delete newF.paymentStatus;
+                        return newF;
+                      });
+                      setContextMenu(null);
+                    }}
+                  >
+                    Clear Filter
+                  </div>
+                </>
+              )}
+
               {Object.keys(hiddenColumns).length > 0 && (
-                <div
-                  className="px-4 py-2 hover:bg-[#f1f3f4] cursor-pointer text-[#1a73e8] text-[13px] flex items-center gap-3 transition-colors"
-                  onClick={showAllColumns}
-                >
-                  <Eye size={16} className="text-[#1a73e8]" /> Show All Columns
-                </div>
+                <>
+                  <div className="w-full h-px bg-[#dadce0] my-1" />
+                  <div
+                    className="px-4 py-2 hover:bg-[#f1f3f4] cursor-pointer text-[#1a73e8] text-[13px] flex items-center gap-3 transition-colors"
+                    onClick={showAllColumns}
+                  >
+                    <Eye size={16} className="text-[#1a73e8]" /> Show All Columns
+                  </div>
+                </>
               )}
               {contextMenu.rowId && <div className="w-full h-px bg-[#dadce0] my-1" />}
             </>
           )}
           {contextMenu.rowId && (
             <>
-              <div
-                className="px-4 py-2 hover:bg-[#fce8e6] cursor-pointer text-[#d93025] text-[13px] flex items-center gap-3 transition-colors"
-                onClick={() => handleDeleteResponse(contextMenu.rowId)}
-              >
-                <Trash2 size={16} className="text-[#d93025]" /> Delete Row
-              </div>
+              {selectionBounds && selectionBounds.rEnd > selectionBounds.rStart ? (
+                <div
+                  className="px-4 py-2 hover:bg-[#fce8e6] cursor-pointer text-[#d93025] text-[13px] flex items-center gap-3 transition-colors"
+                  onClick={() => {
+                    const rowIds = [];
+                    for(let i=selectionBounds.rStart; i<=selectionBounds.rEnd; i++) {
+                      if(rows[i] && rows[i].original._id) rowIds.push(rows[i].original._id);
+                    }
+                    if(rowIds.length > 1) handleMultiDelete(rowIds);
+                    else handleDeleteResponse(contextMenu.rowId);
+                  }}
+                >
+                  <Trash2 size={16} className="text-[#d93025]" /> Delete {selectionBounds.rEnd - selectionBounds.rStart + 1} Rows
+                </div>
+              ) : (
+                <div
+                  className="px-4 py-2 hover:bg-[#fce8e6] cursor-pointer text-[#d93025] text-[13px] flex items-center gap-3 transition-colors"
+                  onClick={() => handleDeleteResponse(contextMenu.rowId)}
+                >
+                  <Trash2 size={16} className="text-[#d93025]" /> Delete Row
+                </div>
+              )}
             </>
           )}
         </div>

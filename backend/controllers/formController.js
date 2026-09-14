@@ -281,6 +281,7 @@ export const submitFormManualPaymentProof = async (req, res) => {
     const form = await Form.findById(formId);
     if (!form) return res.status(404).json({ message: 'Form not found' });
 
+    // Update the FormPayment document to PENDING_VERIFICATION
     let payment = await FormPayment.findOne({ formId, orderId });
     if (payment) {
       payment.status = 'PENDING_VERIFICATION';
@@ -304,29 +305,43 @@ export const submitFormManualPaymentProof = async (req, res) => {
       } catch (e) {}
     }
 
-    // Process answers & scores
-    const allQuestions = form.sections.flatMap((s) => s.elements);
-    const questionMap = new Map(allQuestions.map((q) => [q.id, q]));
+    // Try to find existing PENDING response for this orderId (created at payment initiation)
+    const existingResponse = await Response.findOne({ 'paymentDetails.orderId': orderId });
 
-    const newResponse = new Response({
-      formId,
-      userId: req.user ? req.user.id : null,
-      answers,
-      respondentEmail: form.settings.collectEmails !== 'DO_NOT_COLLECT' ? targetEmail : null,
-      paymentStatus: 'PENDING_VERIFICATION',
-      paymentDetails: {
-        orderId: orderId || '',
-        txnRef: payment ? payment.txnRef : '',
-        baseAmount: payment ? payment.baseAmount : form.settings.paymentAmount,
-        exactAmount: payment ? payment.exactAmount : form.settings.paymentAmount,
+    if (existingResponse) {
+      // Update the existing PENDING response with manual proof details
+      existingResponse.paymentStatus = 'PENDING_VERIFICATION';
+      existingResponse.paymentDetails = {
+        ...existingResponse.paymentDetails,
         screenshotUrl: screenshotUrl || '',
         transactionId: transactionId || '',
         phoneNumber: phoneNumber || '',
         paidAt: new Date()
-      }
-    });
+      };
+      await existingResponse.save();
+    } else {
+      // Fallback: create a new response if no existing one was found
+      const allQuestions = form.sections.flatMap((s) => s.elements);
 
-    await newResponse.save();
+      const newResponse = new Response({
+        formId,
+        userId: req.user ? req.user.id : null,
+        answers,
+        respondentEmail: form.settings.collectEmails !== 'DO_NOT_COLLECT' ? targetEmail : null,
+        paymentStatus: 'PENDING_VERIFICATION',
+        paymentDetails: {
+          orderId: orderId || '',
+          txnRef: payment ? payment.txnRef : '',
+          baseAmount: payment ? payment.baseAmount : form.settings.paymentAmount,
+          exactAmount: payment ? payment.exactAmount : form.settings.paymentAmount,
+          screenshotUrl: screenshotUrl || '',
+          transactionId: transactionId || '',
+          phoneNumber: phoneNumber || '',
+          paidAt: new Date()
+        }
+      });
+      await newResponse.save();
+    }
 
     res.status(201).json({
       success: true,
@@ -382,7 +397,7 @@ export const submitFormResponse = async (req, res) => {
             txnRef: paymentDoc.txnRef,
             baseAmount: paymentDoc.baseAmount,
             exactAmount: paymentDoc.exactAmount,
-            paidAt: new Date()
+            paidAt: paymentDoc.status === 'SUCCESS' ? new Date() : null
           };
         }
       }

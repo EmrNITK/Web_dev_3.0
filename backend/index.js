@@ -10,7 +10,7 @@ import authRoutes from './routes/authRoutes.js';
 
 // Initialize App
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Database
 connectDB();

@@ -84,6 +84,7 @@ router.get('/forms/:formId/responses', responseController.getFormResponses);
 router.post('/forms/:formId/responses', responseController.createBlankResponse);
 router.put('/responses/:responseId/answer', responseController.updateAnswer);
 router.put('/responses/:responseId/core', responseController.updateCoreField);
+router.post('/responses/delete-batch', responseController.deleteManyResponses);
 router.delete('/responses/:responseId', responseController.deleteResponse);
 router.get('/responsepage/form/:id', responseController.getFormById);
 

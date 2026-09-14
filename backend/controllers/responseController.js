@@ -64,6 +64,12 @@ export const getFormResponses = async (req, res) => {
     const query = { formId };
     if (filters.respondentEmail) query.respondentEmail = new RegExp(filters.respondentEmail, 'i');
     if (filters.remark) query.remark = new RegExp(filters.remark, 'i');
+    if (filters.paymentStatus) {
+      query.$or = [
+        { paymentStatus: filters.paymentStatus },
+        { 'paymentDetails.status': filters.paymentStatus }
+      ];
+    }
 
     const responses = await Response.find(query)
       .sort({ [sort]: order === 'desc' ? -1 : 1 })
@@ -158,6 +164,31 @@ export const deleteResponse = async (req, res) => {
 
     await response.deleteOne();
     res.json({ message: 'Response deleted' });
+  } catch (error) {
+    res.status(error.status || 500).json({ message: error.message || 'Server error' });
+  }
+};
+
+export const deleteManyResponses = async (req, res) => {
+  try {
+    const { responseIds } = req.body;
+    if (!Array.isArray(responseIds) || responseIds.length === 0) {
+      return res.status(400).json({ message: 'No response IDs provided' });
+    }
+
+    const responses = await Response.find({ _id: { $in: responseIds } });
+    if (responses.length === 0) {
+      return res.status(404).json({ message: 'Responses not found' });
+    }
+
+    const formId = responses[0].formId;
+    const form = await Form.findById(formId);
+    if (!form) return res.status(404).json({ message: 'Parent form not found' });
+
+    await validateAccess(req, form);
+
+    await Response.deleteMany({ _id: { $in: responseIds } });
+    res.json({ message: `${responses.length} responses deleted` });
   } catch (error) {
     res.status(error.status || 500).json({ message: error.message || 'Server error' });
   }

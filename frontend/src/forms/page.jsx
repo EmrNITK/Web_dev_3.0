@@ -286,6 +286,28 @@ export default function PublicForm() {
     localStorage.setItem(storageKey, JSON.stringify({ answers, otherValues, respondentEmail, currentSectionIndex, sectionHistory }));
   }, [answers, otherValues, respondentEmail, currentSectionIndex, sectionHistory, storageKey]);
 
+  // On Component Mount - Check for saved payment session
+  useEffect(() => {
+    const savedSessionStr = localStorage.getItem(`payment_session_${id}`);
+    if (savedSessionStr) {
+      try {
+        const parsed = JSON.parse(savedSessionStr);
+        if (parsed && parsed.session) {
+          setPaymentSession(parsed.session);
+          if (parsed.status === 'SUCCESS') {
+            setIsSubmitted(true);
+            setSubmissionResult({ message: parsed.confirmationMessage || "Your payment was successful and response recorded." });
+          } else {
+            setIsPaymentStep(true);
+            setPaymentStatus(parsed.status || 'PENDING');
+          }
+        }
+      } catch (e) {
+        console.error("Error parsing payment session", e);
+      }
+    }
+  }, [id]);
+
   useEffect(() => {
     const localSubmitted = localStorage.getItem(`submitted_${id}`);
 
@@ -412,7 +434,14 @@ export default function PublicForm() {
         setPaymentSession(res.data);
         setPaymentStatus('PENDING');
         setIsPaymentStep(true);
+        localStorage.setItem(`payment_session_${id}`, JSON.stringify({
+          session: res.data,
+          status: 'PENDING',
+          confirmationMessage: form?.settings?.confirmationMessage || ''
+        }));
         window.scrollTo(0, 0);
+        // Submit the pending response immediately
+        await handleSubmit(res.data.orderId, true);
       } else {
         toast.error(res.data.message || "Failed to initialize payment");
       }
@@ -435,10 +464,20 @@ export default function PublicForm() {
               clearInterval(pollingRef.current);
               toast.success("Payment verified successfully!");
               setTimeout(() => {
-                handleSubmit(paymentSession.orderId);
+                // Read confirmationMessage from already-stored session (set at initiation when form was loaded)
+                const storedStr = localStorage.getItem(`payment_session_${id}`);
+                const storedSession = storedStr ? JSON.parse(storedStr) : {};
+                const confirmMsg = storedSession.confirmationMessage || form?.settings?.confirmationMessage || "Your payment was successful and response recorded.";
+                // Write SUCCESS + confirmationMessage atomically so reload always has it
+                localStorage.setItem(`payment_session_${id}`, JSON.stringify({ session: paymentSession, status: 'SUCCESS', confirmationMessage: confirmMsg }));
+                setSubmissionResult({ message: confirmMsg });
+                setIsSubmitted(true);
+                localStorage.removeItem(storageKey);
+                localStorage.setItem(`submitted_${id}`, 'true');
               }, 2500);
             } else if (res.data.status === 'EXPIRED') {
               setPaymentStatus('EXPIRED');
+              localStorage.setItem(`payment_session_${id}`, JSON.stringify({ session: paymentSession, status: 'EXPIRED' }));
               clearInterval(pollingRef.current);
             }
           }
@@ -478,7 +517,7 @@ export default function PublicForm() {
     window.scrollTo(0, 0);
   };
 
-  const handleSubmit = async (paymentOrderId = null) => {
+  const handleSubmit = async (paymentOrderId = null, isPendingPayment = false) => {
     if (!validate() && !isPaymentStep) return;
     if (isSubmitting || isSubmitted) return;
     setIsSubmitting(true);
@@ -503,10 +542,12 @@ export default function PublicForm() {
         withCredentials: true
       });
 
-      setSubmissionResult(response.data);
-      setIsSubmitted(true);
-      localStorage.removeItem(storageKey);
-      localStorage.setItem(`submitted_${id}`, 'true');
+      if (!isPendingPayment) {
+        setSubmissionResult(response.data);
+        setIsSubmitted(true);
+        localStorage.removeItem(storageKey);
+        localStorage.setItem(`submitted_${id}`, 'true');
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Submission error");
     } finally {
@@ -551,6 +592,7 @@ export default function PublicForm() {
         });
         setIsSubmitted(true);
         localStorage.removeItem(storageKey);
+        localStorage.removeItem(`payment_session_${id}`);
         localStorage.setItem(`submitted_${id}`, 'true');
       }
     } catch (err) {
@@ -577,6 +619,13 @@ export default function PublicForm() {
         toast.error(`Couldn't open the app. Try scanning the QR code, or use "Copy UPI ID" and pay manually.`);
       }
     }, 1500);
+  };
+
+  const handleResetForm = () => {
+    localStorage.removeItem(`payment_session_${id}`);
+    localStorage.removeItem(storageKey);
+    localStorage.removeItem(`submitted_${id}`);
+    window.location.reload();
   };
 
   useEffect(() => {
@@ -729,7 +778,7 @@ export default function PublicForm() {
     </div>
   );
 
-  if (hasAlreadySubmitted) {
+  if (hasAlreadySubmitted && !isSubmitted) {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center p-4">
         <div className="bg-[#0c0c0c] border border-zinc-800 rounded-md p-8 text-center max-w-md w-full shadow-lg">
@@ -832,32 +881,22 @@ export default function PublicForm() {
             )}
 
             {!form.settings.limitToOneResponse && (
-              <Button onClick={() => window.location.reload()} className="bg-zinc-200 text-black hover:bg-white h-9 text-sm font-semibold">Submit another response</Button>
+              <Button onClick={handleResetForm} className="bg-zinc-200 text-black hover:bg-white h-9 text-sm font-semibold">Submit another response</Button>
             )}
           </div>
         ) : isPaymentStep && paymentSession ? (
           /* CLEAN MICROSOFT FORMS STYLE PAYMENT STEP CARD */
           <div className="space-y-4 animate-in fade-in duration-200">
             {paymentStatus === 'SUCCESS' ? (
-              <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-green-500 rounded-md p-8 text-center shadow-sm">
-                <CheckCircle2 className="text-green-500 w-12 h-12 mx-auto mb-3" />
-                <h2 className="text-xl font-bold text-white mb-1">Payment Received</h2>
-                <p className="text-sm text-zinc-400 mb-3">
-                  Payment of <span className="font-semibold text-white">₹{paymentSession.exactAmount.toFixed(2)}</span> has been successfully verified.
+              <div className="bg-[#0c0c0c] border border-zinc-800 border-t-2 border-t-green-500 rounded-md p-10 text-center shadow-sm">
+                <CheckCircle2 className="text-green-500 w-14 h-14 mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">Payment Verified!</h2>
+                <p className="text-sm text-zinc-400 mb-6">
+                  ₹<span className="font-semibold text-white">{paymentSession.exactAmount?.toFixed(2)}</span> received successfully.
                 </p>
-                <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 mb-6 bg-[#0a0a0a] border border-zinc-800 py-2 px-4 rounded-md inline-flex">
-                  <Loader2 className="animate-spin w-3.5 h-3.5 text-[#0078d4]" />
-                  <span>Submitting your form response...</span>
-                </div>
-                <div>
-                  <Button
-                    onClick={() => handleSubmit(paymentSession.orderId)}
-                    disabled={isSubmitting}
-                    className="bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold h-9 text-sm px-6 rounded"
-                  >
-                    {isSubmitting && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
-                    Submit Now
-                  </Button>
+                <div className="flex items-center justify-center gap-2 text-xs text-zinc-400 bg-[#0a0a0a] border border-zinc-800 py-2.5 px-5 rounded-full inline-flex mx-auto">
+                  <Loader2 className="animate-spin w-3.5 h-3.5 text-green-400" />
+                  <span>Finalizing your submission…</span>
                 </div>
               </div>
             ) : (
