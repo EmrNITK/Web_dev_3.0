@@ -395,18 +395,100 @@ export default function PublicForm() {
     }
   }, [form, userProfile, respondentEmail]);
 
+  // Evaluate if an element should be visible based on its conditions (AND logic)
+  const isElementVisible = useCallback((element, currentAnswers, currentOthers) => {
+    if (!element.conditions || element.conditions.length === 0) return true;
+
+    return element.conditions.every(cond => {
+      if (!cond.questionId) return true;
+      const rawVal = currentAnswers[cond.questionId];
+      if (rawVal === undefined || rawVal === null || rawVal === '') {
+        if (cond.operator === 'isEmpty') return true;
+        if (cond.operator === 'isNotEmpty') return false;
+        return false;
+      }
+
+      const targetVal = String(cond.value || '').trim().toLowerCase();
+
+      let resolvedVals = [];
+      if (Array.isArray(rawVal)) {
+        resolvedVals = rawVal.map(v => (typeof v === 'string' && v.startsWith('__OTHER__')) ? (currentOthers[cond.questionId] || 'Other') : String(v));
+      } else if (typeof rawVal === 'string' && rawVal.startsWith('__OTHER__')) {
+        resolvedVals = [currentOthers[cond.questionId] || 'Other'];
+      } else {
+        resolvedVals = [String(rawVal)];
+      }
+
+      const op = cond.operator || 'equals';
+      switch (op) {
+        case 'equals':
+          return resolvedVals.some(v => v.trim().toLowerCase() === targetVal);
+        case 'notEquals':
+          return !resolvedVals.some(v => v.trim().toLowerCase() === targetVal);
+        case 'contains':
+          return resolvedVals.some(v => v.toLowerCase().includes(targetVal));
+        case 'notContains':
+          return !resolvedVals.some(v => v.toLowerCase().includes(targetVal));
+        case 'isEmpty':
+          return resolvedVals.length === 0 || resolvedVals.every(v => v.trim() === '');
+        case 'isNotEmpty':
+          return resolvedVals.length > 0 && resolvedVals.some(v => v.trim() !== '');
+        default:
+          return true;
+      }
+    });
+  }, []);
+
+  // Stable option shuffling per element
+  const getShuffledOptions = useCallback((el) => {
+    if (!el.options || el.options.length <= 1) return el.options || [];
+    if (!el.shuffleOptions) return el.options;
+
+    const optionsCopy = [...el.options];
+    optionsCopy.sort((a, b) => {
+      if (a.isOther) return 1;
+      if (b.isOther) return -1;
+      const hashA = (id + el.id + a.id).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      const hashB = (id + el.id + b.id).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+      return (hashA % 13) - (hashB % 13);
+    });
+    return optionsCopy;
+  }, [id]);
+
   const displayElements = useMemo(() => {
     if (!form?.sections?.[currentSectionIndex]) return [];
-    let elements = [...form.sections[currentSectionIndex].elements];
+    let elements = form.sections[currentSectionIndex].elements.filter(el =>
+      isElementVisible(el, answers, otherValues)
+    );
 
     if (form.settings.shuffleQuestionOrder) {
-      for (let i = elements.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [elements[i], elements[j]] = [elements[j], elements[i]];
-      }
+      const secId = form.sections[currentSectionIndex].id || currentSectionIndex;
+      elements = [...elements].sort((a, b) => {
+        const hashA = (id + secId + a.id).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+        const hashB = (id + secId + b.id).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+        return (hashA % 17) - (hashB % 17);
+      });
     }
     return elements;
-  }, [form, currentSectionIndex]);
+  }, [form, currentSectionIndex, answers, otherValues, isElementVisible, id]);
+
+  // Determine section navigation destination based on selected options' goToSection
+  const nextDestination = useMemo(() => {
+    if (!form?.sections?.[currentSectionIndex]) return 'NEXT';
+
+    for (const el of displayElements) {
+      if (['MULTIPLE_CHOICE', 'DROPDOWN'].includes(el.type)) {
+        const val = answers[el.id];
+        if (!val) continue;
+
+        const opt = el.options?.find(o => o.isOther ? (typeof val === 'string' && val.startsWith('__OTHER__')) : o.text === val);
+        if (opt && opt.goToSection && opt.goToSection !== 'NEXT') {
+          return opt.goToSection;
+        }
+      }
+    }
+    return 'NEXT';
+  }, [form, currentSectionIndex, displayElements, answers]);
 
   const validate = () => {
     const newErrors = {};
@@ -415,9 +497,26 @@ export default function PublicForm() {
     }
     displayElements.forEach(el => {
       const ans = answers[el.id];
+
+      // Required check
       if (el.required && !['TEXT_ONLY', 'IMAGE'].includes(el.type)) {
-        if (!ans || (Array.isArray(ans) && ans.length === 0)) {
+        if (!ans || (Array.isArray(ans) && ans.length === 0) || (typeof ans === 'string' && !ans.trim())) {
           newErrors[el.id] = "Required field.";
+        }
+      }
+
+      // Regex validation check for SHORT_TEXT and LONG_TEXT
+      if (el.validation?.enabled && el.validation?.regex && ['SHORT_TEXT', 'LONG_TEXT'].includes(el.type)) {
+        const strVal = typeof ans === 'string' ? ans.trim() : '';
+        if (strVal) {
+          try {
+            const re = new RegExp(el.validation.regex);
+            if (!re.test(strVal)) {
+              newErrors[el.id] = el.validation.errorMessage || "Invalid format.";
+            }
+          } catch (e) {
+            console.error("Invalid regex pattern:", el.validation.regex);
+          }
         }
       }
     });
@@ -464,11 +563,9 @@ export default function PublicForm() {
               clearInterval(pollingRef.current);
               toast.success("Payment verified successfully!");
               setTimeout(() => {
-                // Read confirmationMessage from already-stored session (set at initiation when form was loaded)
                 const storedStr = localStorage.getItem(`payment_session_${id}`);
                 const storedSession = storedStr ? JSON.parse(storedStr) : {};
                 const confirmMsg = storedSession.confirmationMessage || form?.settings?.confirmationMessage || "Your payment was successful and response recorded.";
-                // Write SUCCESS + confirmationMessage atomically so reload always has it
                 localStorage.setItem(`payment_session_${id}`, JSON.stringify({ session: paymentSession, status: 'SUCCESS', confirmationMessage: confirmMsg }));
                 setSubmissionResult({ message: confirmMsg });
                 setIsSubmitted(true);
@@ -496,8 +593,33 @@ export default function PublicForm() {
 
   const handleNext = () => {
     if (!validate()) return;
-    if (currentSectionIndex === form.sections.length - 1 && form.settings.paymentRequired) {
-      initiatePaymentSession();
+
+    const dest = nextDestination;
+    if (dest === 'SUBMIT') {
+      if (form.settings.paymentRequired) {
+        initiatePaymentSession();
+      } else {
+        handleSubmit();
+      }
+      return;
+    }
+
+    if (dest !== 'NEXT') {
+      const targetIdx = form.sections.findIndex(s => s.id === dest);
+      if (targetIdx !== -1) {
+        setSectionHistory([...sectionHistory, currentSectionIndex]);
+        setCurrentSectionIndex(targetIdx);
+        window.scrollTo(0, 0);
+        return;
+      }
+    }
+
+    if (currentSectionIndex === form.sections.length - 1) {
+      if (form.settings.paymentRequired) {
+        initiatePaymentSession();
+      } else {
+        handleSubmit();
+      }
     } else {
       setSectionHistory([...sectionHistory, currentSectionIndex]);
       setCurrentSectionIndex(currentSectionIndex + 1);
@@ -513,24 +635,39 @@ export default function PublicForm() {
     const hist = [...sectionHistory];
     const prev = hist.pop();
     setSectionHistory(hist);
-    setCurrentSectionIndex(prev);
+    setCurrentSectionIndex(prev !== undefined ? prev : 0);
     window.scrollTo(0, 0);
   };
+
+  const getProcessedAnswers = useCallback(() => {
+    const processed = [];
+    if (form?.sections) {
+      form.sections.forEach(sec => {
+        sec.elements.forEach(el => {
+          if (isElementVisible(el, answers, otherValues)) {
+            const v = answers[el.id];
+            if (v !== undefined && v !== null && v !== '') {
+              let finalValue = v;
+              if (typeof v === 'string' && v.startsWith('__OTHER__')) {
+                finalValue = otherValues[el.id] || 'Other';
+              } else if (Array.isArray(v)) {
+                finalValue = v.map(item => (typeof item === 'string' && item.startsWith('__OTHER__')) ? (otherValues[el.id] || 'Other') : item);
+              }
+              processed.push({ questionId: el.id, value: finalValue });
+            }
+          }
+        });
+      });
+    }
+    return processed;
+  }, [form, answers, otherValues, isElementVisible]);
 
   const handleSubmit = async (paymentOrderId = null, isPendingPayment = false) => {
     if (!validate() && !isPaymentStep) return;
     if (isSubmitting || isSubmitted) return;
     setIsSubmitting(true);
 
-    const processedAnswers = Object.entries(answers).map(([k, v]) => {
-      let finalValue = v;
-      if (typeof v === 'string' && v.startsWith('__OTHER__')) {
-        finalValue = otherValues[k] || 'Other';
-      } else if (Array.isArray(v)) {
-        finalValue = v.map(item => item.startsWith('__OTHER__') ? (otherValues[k] || 'Other') : item);
-      }
-      return { questionId: k, value: finalValue };
-    });
+    const processedAnswers = getProcessedAnswers();
 
     try {
       const response = await axios.post(`${API_URL}/forms/public/${id}`, {
@@ -564,16 +701,7 @@ export default function PublicForm() {
     }
 
     setIsSubmittingManual(true);
-
-    const processedAnswers = Object.entries(answers).map(([k, v]) => {
-      let finalValue = v;
-      if (typeof v === 'string' && v.startsWith('__OTHER__')) {
-        finalValue = otherValues[k] || 'Other';
-      } else if (Array.isArray(v)) {
-        finalValue = v.map(item => item.startsWith('__OTHER__') ? (otherValues[k] || 'Other') : item);
-      }
-      return { questionId: k, value: finalValue };
-    });
+    const processedAnswers = getProcessedAnswers();
 
     try {
       const res = await axios.post(`${API_URL}/forms/public/${id}/manual-payment-proof`, {
@@ -663,9 +791,10 @@ export default function PublicForm() {
         return <Textarea value={val} onChange={(e) => update(e.target.value)} className={cn("bg-[#0a0a0a] border-zinc-800 text-zinc-100 min-h-[80px] text-sm focus-visible:ring-1 focus-visible:ring-[#0078d4]", hasError && "border-red-500")} placeholder="Enter detailed response" />;
 
       case 'MULTIPLE_CHOICE':
+        const mcOptions = getShuffledOptions(el);
         return (
           <div className="grid gap-1.5">
-            {el.options.map(opt => {
+            {mcOptions.map(opt => {
               const targetVal = opt.isOther ? `__OTHER__${opt.id}` : opt.text;
               const isSelected = val === targetVal;
               return (
@@ -673,7 +802,7 @@ export default function PublicForm() {
                   <label className="flex items-start cursor-pointer w-full">
                     <input type="radio" checked={isSelected} onChange={() => update(targetVal)} className="mt-0.5 w-4 h-4 accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 w-auto rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-48 max-w-full w-auto h-auto object-contain rounded border border-zinc-700 bg-[#050505]" />}
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
                     </div>
                   </label>
@@ -694,9 +823,10 @@ export default function PublicForm() {
 
       case 'CHECKBOXES':
         const selected = Array.isArray(val) ? val : [];
+        const cbOptions = getShuffledOptions(el);
         return (
           <div className="grid gap-1.5">
-            {el.options.map(opt => {
+            {cbOptions.map(opt => {
               const targetVal = opt.isOther ? `__OTHER__${opt.id}` : opt.text;
               const isSelected = selected.includes(targetVal);
               const handleChange = (checked) => update(checked ? [...selected, targetVal] : selected.filter(x => x !== targetVal));
@@ -706,7 +836,7 @@ export default function PublicForm() {
                     <input type="checkbox" checked={isSelected} onChange={(e) => handleChange(e.target.checked)} className="mt-0.5 w-4 h-4 rounded accent-[#0078d4] bg-black border-zinc-700 shrink-0" />
                     <div className="ml-2.5 flex flex-col gap-2 w-full">
                       <span className="text-sm font-medium text-zinc-200">{opt.isOther ? "Other" : opt.text}</span>
-                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-36 w-auto rounded border border-zinc-700 bg-[#050505]" />}
+                      {opt.image && !opt.isOther && <img src={opt.image} alt="Option visual" className="max-h-48 max-w-full w-auto h-auto object-contain rounded border border-zinc-700 bg-[#050505]" />}
                     </div>
                   </label>
                   {opt.isOther && isSelected && (
@@ -725,13 +855,14 @@ export default function PublicForm() {
         );
 
       case 'DROPDOWN':
+        const ddOptions = getShuffledOptions(el);
         return (
           <Select value={val} onValueChange={update}>
             <SelectTrigger className={cn("w-full bg-[#0a0a0a] border-zinc-800 text-zinc-200 h-9 text-sm", hasError && "border-red-500")}>
               <SelectValue placeholder="Select option" />
             </SelectTrigger>
             <SelectContent className="bg-[#111] border-zinc-800 text-zinc-300">
-              {el.options.map((opt) => <SelectItem key={opt.id} value={opt.text} className="text-sm cursor-pointer">{opt.text}</SelectItem>)}
+              {ddOptions.map((opt) => <SelectItem key={opt.id} value={opt.text} className="text-sm cursor-pointer">{opt.text}</SelectItem>)}
             </SelectContent>
           </Select>
         );
@@ -1193,16 +1324,21 @@ export default function PublicForm() {
               <Button variant="outline" onClick={handleBack} disabled={currentSectionIndex === 0} className="h-9 text-sm border-zinc-800 bg-transparent text-zinc-300 hover:bg-zinc-900 disabled:opacity-0">
                 <ChevronLeft size={16} className="mr-1" /> Back
               </Button>
-              <Button
-                onClick={currentSectionIndex === form.sections.length - 1 ? (form.settings.paymentRequired ? handleNext : () => handleSubmit()) : handleNext}
-                disabled={isSubmitting || isInitializingPayment}
-                className="h-9 text-sm bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold px-6 rounded"
-              >
-                {(isSubmitting || isInitializingPayment) && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
-                {currentSectionIndex === form.sections.length - 1
-                  ? (form.settings.paymentRequired ? "Proceed to Payment" : "Submit")
-                  : "Next"}
-              </Button>
+              {(() => {
+                const isFinalStep = nextDestination === 'SUBMIT' || currentSectionIndex === form.sections.length - 1;
+                return (
+                  <Button
+                    onClick={isFinalStep ? (form.settings.paymentRequired ? handleNext : () => handleSubmit()) : handleNext}
+                    disabled={isSubmitting || isInitializingPayment}
+                    className="h-9 text-sm bg-[#0078d4] hover:bg-[#005a9e] text-white font-semibold px-6 rounded"
+                  >
+                    {(isSubmitting || isInitializingPayment) && <Loader2 className="animate-spin mr-2 w-4 h-4" />}
+                    {isFinalStep
+                      ? (form.settings.paymentRequired ? "Proceed to Payment" : "Submit")
+                      : "Next"}
+                  </Button>
+                );
+              })()}
             </div>
           </div>
         )}
